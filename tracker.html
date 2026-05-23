@@ -284,6 +284,7 @@ function loadData() {
   fetch(SCRIPT_URL + '?action=getData')
     .then(function(r) { return r.json(); })
     .then(function(data) {
+      if (data && data.ok === false) throw new Error(data.error || 'Backend returned an error');
       S = data;
       setStatus('ok');
       render();
@@ -321,17 +322,17 @@ function flushSave() {
       saveInFlight = false;
       if (r && r.ok === false) {
         pendingSaveAction = action;
-        setStatus('err');
+        setStatus('err', r.error);
         setTimeout(flushSave, 3000);
         return;
       }
       if (pendingSaveAction) flushSave();
       else setStatus('ok');
     })
-    .catch(function() {
+    .catch(function(error) {
       saveInFlight = false;
       pendingSaveAction = action;
-      setStatus('err');
+      setStatus('err', error && error.message ? error.message : String(error || 'Unknown error'));
       setTimeout(flushSave, 3000);
     });
 }
@@ -346,22 +347,39 @@ function pushSave(action) {
     });
   }
 
+  var controller = new AbortController();
+  var timeout = setTimeout(function() {
+    controller.abort();
+  }, 15000);
+
   return fetch(SCRIPT_URL, {
     method:  'POST',
     body:    JSON.stringify({ data: JSON.stringify(S), action: action || {} }),
-    headers: { 'Content-Type': 'application/json' }
+    headers: { 'Content-Type': 'application/json' },
+    signal: controller.signal
   })
   .then(function(r) {
-    if (!r.ok) throw new Error('Save failed with status ' + r.status);
-    return r.json();
+    clearTimeout(timeout);
+    return r.text().then(function(text) {
+      var data = null;
+      try { data = text ? JSON.parse(text) : null; } catch(e) {}
+      if (!r.ok) throw new Error(data && data.error ? data.error : 'Save failed with status ' + r.status);
+      if (!data) throw new Error('Backend returned an empty or invalid response');
+      return data;
+    });
+  })
+  .catch(function(error) {
+    clearTimeout(timeout);
+    throw error;
   });
 }
 
-function setStatus(s) {
+function setStatus(s, detail) {
   var el  = document.getElementById('status');
   var txt = document.getElementById('status-txt');
   el.className = 'status-wrap st-' + s;
-  txt.textContent = s === 'save' ? 'Saving…' : s === 'ok' ? 'All saved' : 'Save failed — check URL';
+  txt.textContent = s === 'save' ? 'Saving…' : s === 'ok' ? 'All saved' : 'Save failed — retrying';
+  txt.title = detail || '';
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@
 
 var DATA_SHEET = 'CRO_Data';
 var LOG_SHEET  = 'Activity_Log';
+var SPREADSHEET_ID = '';
 
 // GET  ?action=getData   -> returns full tracker JSON
 // POST { data, action }  -> saves data, logs action
@@ -53,17 +54,17 @@ function _json(obj) {
 
 function _read() {
   try {
-    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var ss    = _spreadsheet();
     var sheet = ss.getSheetByName(DATA_SHEET);
     if (!sheet) { sheet = ss.insertSheet(DATA_SHEET); _initLog(ss); return _seed(); }
     var val = sheet.getRange('A1').getValue();
     return val ? JSON.parse(val) : _seed();
-  } catch(e) { return _seed(); }
+  } catch(e) { return { ok: false, error: e.toString() }; }
 }
 
 function _write(jsonStr, actionInfo) {
   try {
-    var ss    = SpreadsheetApp.getActiveSpreadsheet();
+    var ss    = _spreadsheet();
     var sheet = ss.getSheetByName(DATA_SHEET) || ss.insertSheet(DATA_SHEET);
     sheet.getRange('A1').setValue(jsonStr);
 
@@ -81,6 +82,13 @@ function _write(jsonStr, actionInfo) {
     ]);
     return { ok: true };
   } catch(e) { return { ok: false, error: e.toString() }; }
+}
+
+function _spreadsheet() {
+  if (SPREADSHEET_ID) return SpreadsheetApp.openById(SPREADSHEET_ID);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No active spreadsheet. Open the Sheet, go to Extensions -> Apps Script, paste Code.gs there, or set SPREADSHEET_ID in Code.gs.');
+  return ss;
 }
 
 function _initLog(ss) {

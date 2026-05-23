@@ -20,6 +20,8 @@ This project deploys best as a Google Apps Script web app attached to a Google S
 
 The web app URL is the deployed tracker. No separate static hosting is required.
 
+If you created the Apps Script project outside the Google Sheet, copy the Sheet ID from its URL and set `SPREADSHEET_ID` near the top of `Code.gs`. If you opened Apps Script from `Extensions -> Apps Script` inside the Sheet, you can leave `SPREADSHEET_ID` blank.
+
 ## Vercel Static Deployment
 
 Vercel can host the frontend and proxy requests to the Apps Script backend. The Google Sheet backend still has to be deployed through Apps Script first.
