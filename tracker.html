@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minding Art — Upsell CRO Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.8.0/dist/tabler-icons.min.css">
+<style>
+/* ─── Reset & base ────────────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;background:#f5f5f3;color:#1a1a18;min-height:100vh;font-size:14px}
+
+/* ─── Topbar ──────────────────────────────────────────────────── */
+.topbar{background:#fff;border-bottom:1px solid #e8e8e5;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;gap:12px}
+.logo{font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+.logo-sub{font-size:11px;font-weight:400;color:#999;margin-left:8px}
+.status-wrap{display:flex;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
+.st-ok   .status-dot{background:#4caf50}
+.st-ok   .status-txt{color:#3d8b40}
+.st-save .status-dot{background:#2196f3;animation:blink 1s infinite}
+.st-save .status-txt{color:#1565c0}
+.st-err  .status-dot{background:#f44336}
+.st-err  .status-txt{color:#c62828}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ─── Setup screen ────────────────────────────────────────────── */
+.setup-screen{max-width:560px;margin:60px auto;padding:0 16px}
+.setup-card{background:#fff;border:1px solid #e8e8e5;border-radius:16px;padding:32px}
+.setup-logo{font-size:22px;font-weight:700;margin-bottom:4px}
+.setup-sub{font-size:13px;color:#888;margin-bottom:28px}
+.setup-steps{counter-reset:step;margin-bottom:24px}
+.setup-step{display:flex;gap:14px;margin-bottom:18px;align-items:flex-start}
+.step-num{width:24px;height:24px;border-radius:50%;background:#1a1a18;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;margin-top:1px}
+.step-body{flex:1}
+.step-title{font-size:13px;font-weight:600;margin-bottom:3px}
+.step-desc{font-size:12px;color:#666;line-height:1.5}
+.step-code{font-family:'SFMono-Regular',Consolas,monospace;font-size:11px;background:#f5f5f3;padding:6px 10px;border-radius:6px;margin-top:5px;color:#333;border:1px solid #e8e8e5;word-break:break-all}
+.url-input-wrap{display:flex;gap:8px;margin-top:6px}
+.url-input{flex:1;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:12px;font-family:inherit;outline:none;transition:border-color .2s}
+.url-input:focus{border-color:#1a1a18}
+.btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:1px solid #ddd;background:#fff;color:#1a1a18;font-family:inherit;transition:all .15s;white-space:nowrap}
+.btn:hover{background:#f5f5f3}
+.btn-primary{background:#1a1a18;color:#fff;border-color:#1a1a18}
+.btn-primary:hover{background:#333}
+.btn-sm{font-size:11px;padding:5px 11px}
+.setup-note{font-size:11px;color:#aaa;margin-top:16px;line-height:1.6}
+a{color:#1a1a18;font-weight:600}
+
+/* ─── Main layout ─────────────────────────────────────────────── */
+.wrap{max-width:920px;margin:0 auto;padding:20px 16px}
+
+/* ─── Slot nav ────────────────────────────────────────────────── */
+.slot-nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.stab{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid #ddd;background:#fff;color:#666;transition:all .15s;white-space:nowrap;line-height:1.6}
+.stab.on{background:#1a1a18;color:#fff;border-color:#1a1a18}
+.stab:hover:not(.on){background:#f0f0ee;border-color:#ccc}
+.stab-sub{font-size:9px;opacity:.6;margin-left:4px}
+.stab-add{border-style:dashed}
+
+/* ─── Slot header ─────────────────────────────────────────────── */
+.slot-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;gap:8px}
+.slot-title{font-size:15px;font-weight:700}
+.slot-sub{font-size:12px;color:#999;margin-top:2px}
+
+/* ─── Legend ──────────────────────────────────────────────────── */
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:#777}
+.lic{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+.ic-w{background:#e3f5d0;color:#2d7d0a}
+.ic-f{background:#fce8e8;color:#c42b2b}
+.ic-r{background:#ddeeff;color:#1460a8}
+.ic-p{background:#fff3e0;color:#a06000}
+.ic-i{background:#f0f0ee;color:#888}
+
+/* ─── Element grid ────────────────────────────────────────────── */
+.egrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:580px){.egrid{grid-template-columns:1fr}}
+
+/* ─── Element card ────────────────────────────────────────────── */
+.ecard{background:#fff;border:1px solid #e8e8e5;border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.ecard-hdr{padding:9px 12px;border-bottom:1px solid #f2f2f0;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fafaf8}
+.ecard-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#999}
+.win-chip{font-size:10px;padding:2px 8px;border-radius:20px;background:#e3f5d0;color:#2d7d0a;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.no-win{font-size:10px;color:#ccc;font-style:italic}
+
+/* ─── Variant list ────────────────────────────────────────────── */
+.vlist{flex:1}
+.vitem{display:flex;align-items:center;gap:6px;padding:7px 11px;border-bottom:1px solid #f5f5f3;transition:background .1s}
+.vitem:last-child{border-bottom:none}
+.vitem:hover{background:#fafaf8}
+.vic{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
+.v-val{font-size:12px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.v-val.xout{color:#ccc;text-decoration:line-through}
+.v-meta{display:flex;gap:5px;font-size:10px;color:#aaa;flex-shrink:0;align-items:center}
+.v-rpv{font-weight:600;color:#1a1a18}
+.v-acts{display:flex;gap:2px;flex-shrink:0;opacity:0;transition:opacity .1s}
+.vitem:hover .v-acts{opacity:1}
+.vbtn{background:none;border:none;cursor:pointer;font-size:9px;padding:2px 6px;border-radius:4px;color:#aaa;font-family:inherit;line-height:1.6;transition:all .1s}
+.vbtn:hover{background:#f0f0ee;color:#1a1a18}
+.vbtn-w:hover{background:#e3f5d0;color:#2d7d0a}
+.vbtn-d:hover{background:#fce8e8;color:#c42b2b}
+.vempty{padding:14px 12px;font-size:12px;color:#ccc;text-align:center;font-style:italic}
+
+/* ─── Log button ──────────────────────────────────────────────── */
+.log-btn{width:100%;padding:8px 12px;font-size:11px;cursor:pointer;border:none;border-top:1px solid #f2f2f0;background:transparent;color:#aaa;font-family:inherit;transition:all .15s;text-align:left;display:flex;align-items:center;gap:6px;flex-shrink:0}
+.log-btn:hover{background:#fafaf8;color:#555}
+
+/* ─── Add result form ─────────────────────────────────────────── */
+.aform{background:#f8f8f6;padding:11px 12px;border-top:1px solid #edede9;flex-shrink:0}
+.af-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:8px}
+.af-s{grid-column:1/-1}
+.fg{display:flex;flex-direction:column;gap:3px}
+.flbl{font-size:10px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.04em}
+.fg input,.fg select{font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a18;outline:none;transition:border-color .15s}
+.fg input:focus,.fg select:focus{border-color:#888}
+.af-btns{display:flex;gap:6px}
+
+/* ─── Add-slot form ───────────────────────────────────────────── */
+.sf-wrap{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:16px;margin-bottom:14px}
+.sf-title{font-size:13px;font-weight:600;margin-bottom:12px}
+.sf-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px}
+@media(max-width:580px){.sf-grid{grid-template-columns:1fr}}
+
+/* ─── Add-element card ────────────────────────────────────────── */
+.add-card{background:#fff;border:1.5px dashed #e0e0dd;border-radius:12px;display:flex;flex-direction:column;min-height:90px}
+.ae-btn{width:100%;height:100%;min-height:80px;padding:16px;font-size:12px;cursor:pointer;border:none;background:transparent;color:#bbb;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:all .15s;border-radius:10px}
+.ae-btn:hover{background:#f8f8f6;color:#666}
+.ae-form{padding:12px}
+
+/* ─── Loading / error ─────────────────────────────────────────── */
+.center-msg{text-align:center;padding:60px 20px;color:#aaa}
+.spinner{width:20px;height:20px;border:2px solid #e8e8e5;border-top-color:#888;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.err-msg{color:#c42b2b;font-size:13px}
+
+/* ─── Log link ────────────────────────────────────────────────── */
+.log-link{font-size:11px;color:#bbb;text-align:right;margin-top:14px;padding-top:14px;border-top:1px solid #ebebea}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────────── -->
+<div class="topbar" id="topbar" style="display:none">
+  <div>
+    <span class="logo">Minding Art</span>
+    <span class="logo-sub">Upsell CRO Tracker</span>
+  </div>
+  <div class="status-wrap st-ok" id="status">
+    <span class="status-dot"></span>
+    <span class="status-txt" id="status-txt">All saved</span>
+  </div>
+</div>
+
+<!-- ── Setup screen (shown until URL configured) ─────────────────────────── -->
+<div class="setup-screen" id="setup">
+  <div class="setup-card">
+    <div class="setup-logo">Minding Art CRO Tracker</div>
+    <div class="setup-sub">One-time setup — takes about 5 minutes</div>
+
+    <div class="setup-steps">
+      <div class="setup-step">
+        <div class="step-num">1</div>
+        <div class="step-body">
+          <div class="step-title">Create a Google Sheet</div>
+          <div class="step-desc">Go to <a href="https://sheets.google.com" target="_blank">sheets.google.com</a>, create a new blank spreadsheet, name it <strong>Minding Art CRO Tracker</strong>.</div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">2</div>
+        <div class="step-body">
+          <div class="step-title">Open Apps Script</div>
+          <div class="step-desc">In the spreadsheet: <strong>Extensions → Apps Script</strong>. Delete all default code.</div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">3</div>
+        <div class="step-body">
+          <div class="step-title">Paste Code.gs</div>
+          <div class="step-desc">Open <code>Code.gs</code> from the zip, copy everything, paste it in. Save (Ctrl+S).</div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">4</div>
+        <div class="step-body">
+          <div class="step-title">Deploy as Web App</div>
+          <div class="step-desc">Click <strong>Deploy → New deployment → Web app</strong>.<br>
+            • Execute as: <strong>Me</strong><br>
+            • Who has access: <strong>Anyone</strong><br>
+            Click Deploy, allow permissions, copy the URL.</div>
+        </div>
+      </div>
+      <div class="setup-step">
+        <div class="step-num">5</div>
+        <div class="step-body">
+          <div class="step-title">Paste your Apps Script URL below</div>
+          <div class="step-desc">It looks like:</div>
+          <div class="step-code">https://script.google.com/macros/s/AKfy.../exec</div>
+          <div class="url-input-wrap" style="margin-top:10px">
+            <input class="url-input" id="url-input" type="url" placeholder="https://script.google.com/macros/s/.../exec">
+            <button class="btn btn-primary" onclick="saveUrl()">Connect</button>
+          </div>
+          <div id="url-err" style="font-size:11px;color:#c42b2b;margin-top:5px;display:none">Please enter a valid Apps Script URL</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="setup-note">
+      After connecting, share this HTML file with your team — everyone connects to the same Google Sheet.
+      All changes are logged in the <strong>Activity_Log</strong> tab of your spreadsheet.
+    </div>
+  </div>
+</div>
+
+<!-- ── Main app ───────────────────────────────────────────────────────────── -->
+<div class="wrap" id="app" style="display:none">
+  <div class="center-msg"><div class="spinner"></div>Loading tracker…</div>
+</div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+var SCRIPT_URL = localStorage.getItem('cro_script_url') || '';
+var S          = null;
+var OF         = {};
+var SF         = false;
+var AEF        = {};
+var NFV        = {};
+var NSF        = { funnel:'KLS', platform:'OCU', position:'Pre-Purchase' };
+var saveTimer  = null;
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  if (SCRIPT_URL) {
+    showApp();
+    loadData();
+  }
+  // if no URL: setup screen is already visible by default
+});
+
+function saveUrl() {
+  var v = (document.getElementById('url-input').value || '').trim();
+  if (!v || !v.includes('script.google.com')) {
+    document.getElementById('url-err').style.display = 'block'; return;
+  }
+  document.getElementById('url-err').style.display = 'none';
+  SCRIPT_URL = v;
+  localStorage.setItem('cro_script_url', v);
+  showApp();
+  loadData();
+}
+
+function showApp() {
+  document.getElementById('setup').style.display = 'none';
+  document.getElementById('topbar').style.display = 'flex';
+  document.getElementById('app').style.display    = 'block';
+}
+
+// ── Data ────────────────────────────────────────────────────────────────────
+function loadData() {
+  setStatus('save');
+  fetch(SCRIPT_URL + '?action=getData')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      S = data;
+      setStatus('ok');
+      render();
+    })
+    .catch(function(e) {
+      setStatus('err');
+      document.getElementById('app').innerHTML =
+        '<div class="center-msg err-msg">Could not connect to Google Sheet.<br>' +
+        '<small>' + e.message + '</small><br><br>' +
+        '<button class="btn btn-sm" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Re-configure URL</button></div>';
+    });
+}
+
+function scheduleSave(action) {
+  setStatus('save');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(function() { pushSave(action); }, 900);
+}
+
+function pushSave(action) {
+  fetch(SCRIPT_URL, {
+    method:  'POST',
+    body:    JSON.stringify({ data: JSON.stringify(S), action: action || {} }),
+    headers: { 'Content-Type': 'application/json' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(r) { setStatus(r.ok ? 'ok' : 'err'); })
+  .catch(function()  { setStatus('err'); });
+}
+
+function setStatus(s) {
+  var el  = document.getElementById('status');
+  var txt = document.getElementById('status-txt');
+  el.className = 'status-wrap st-' + s;
+  txt.textContent = s === 'save' ? 'Saving…' : s === 'ok' ? 'All saved' : 'Save failed — check URL';
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function uid()   { return 'v' + Date.now() + Math.random().toString(36).slice(2,5); }
+function fk(s,e) { return s + '|||' + e; }
+function gs(id)  { return S.slots.filter(function(s) { return s.id === id; })[0]; }
+function esc(s)  {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function today() { return new Date().toISOString().slice(0,10); }
+
+function ic(r) {
+  var m = { win:'<span class="vic ic-w">✓</span>', fail:'<span class="vic ic-f">✗</span>',
+            running:'<span class="vic ic-r">↺</span>', inconclusive:'<span class="vic ic-i">~</span>',
+            planned:'<span class="vic ic-p">○</span>' };
+  return m[r] || m.planned;
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function varHTML(v, sid, en) {
+  var rpv  = v.rpv ? '$' + parseFloat(v.rpv).toFixed(2) + '/v' : '';
+  var cvr  = v.cvr ? parseFloat(v.cvr).toFixed(1) + '%' : '';
+  var dt   = v.date ? v.date.slice(5) : '';
+  var xout = v.result === 'fail' ? ' xout' : '';
+  var wbtn = v.result !== 'win'
+    ? '<button class="vbtn vbtn-w" onclick="setWin(\'' + sid + '\',\'' + esc(en) + '\',\'' + v.id + '\')">Set winner</button>'
+    : '';
+  return '<div class="vitem">' + ic(v.result) +
+    '<span class="v-val' + xout + '" title="' + esc(v.value) + '">' + esc(v.value) + '</span>' +
+    '<span class="v-meta">' +
+      (rpv ? '<span class="v-rpv">' + rpv + '</span>' : '') +
+      (cvr ? '<span>' + cvr + '</span>' : '') +
+      (dt  ? '<span>' + dt  + '</span>' : '') +
+    '</span>' +
+    '<span class="v-acts">' + wbtn +
+      '<button class="vbtn vbtn-d" onclick="delV(\'' + sid + '\',\'' + esc(en) + '\',\'' + v.id + '\')">✕</button>' +
+    '</span></div>';
+}
+
+function fval(sid, en) {
+  var k = fk(sid, en);
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'' };
+  return NFV[k];
+}
+
+function afHTML(sid, en) {
+  var f   = fval(sid, en); var k = fk(sid, en);
+  var esc_en = esc(en);
+  var opts = ['fail','win','running','inconclusive','planned'].map(function(r) {
+    return '<option' + (f.result === r ? ' selected' : '') + '>' + r + '</option>';
+  }).join('');
+  return '<div class="aform">' +
+    '<div class="af-g">' +
+      '<div class="fg af-s"><label class="flbl">What was tested</label>' +
+        '<input type="text" value="' + esc(f.value) + '" placeholder="e.g.  $9.95  ·  Mother suggests...  ·  GIF with kid cooking"' +
+        ' oninput="setF(\'' + k + '\',\'value\',this.value)" style="width:100%"></div>' +
+      '<div class="fg"><label class="flbl">Result</label>' +
+        '<select oninput="setF(\'' + k + '\',\'result\',this.value)">' + opts + '</select></div>' +
+      '<div class="fg"><label class="flbl">Date</label>' +
+        '<input type="date" value="' + f.date + '" oninput="setF(\'' + k + '\',\'date\',this.value)"></div>' +
+      '<div class="fg"><label class="flbl">Rev/Visit ($)</label>' +
+        '<input type="number" step="0.01" value="' + esc(f.rpv) + '" placeholder="2.23" oninput="setF(\'' + k + '\',\'rpv\',this.value)"></div>' +
+      '<div class="fg"><label class="flbl">CVR %</label>' +
+        '<input type="number" step="0.01" value="' + esc(f.cvr) + '" placeholder="18.5" oninput="setF(\'' + k + '\',\'cvr\',this.value)"></div>' +
+      '<div class="fg af-s"><label class="flbl">Notes</label>' +
+        '<input type="text" value="' + esc(f.notes) + '" placeholder="Views count, which variant, observations…" oninput="setF(\'' + k + '\',\'notes\',this.value)"></div>' +
+    '</div>' +
+    '<div class="af-btns">' +
+      '<button class="btn btn-primary btn-sm" onclick="addV(\'' + sid + '\',\'' + esc_en + '\')">Add</button>' +
+      '<button class="btn btn-sm" onclick="closeF(\'' + sid + '\',\'' + esc_en + '\')">Cancel</button>' +
+    '</div></div>';
+}
+
+function cardHTML(sid, en, ed) {
+  var k    = fk(sid, en);
+  var wc   = ed.winner
+    ? '<span class="win-chip" title="' + esc(ed.winner) + '">' + esc(ed.winner.length > 22 ? ed.winner.slice(0,22) + '…' : ed.winner) + '</span>'
+    : '<span class="no-win">No winner yet</span>';
+  var vars  = ed.variants.map(function(v) { return varHTML(v, sid, en); }).join('');
+  var empty = !ed.variants.length ? '<div class="vempty">Nothing tested yet</div>' : '';
+  return '<div class="ecard">' +
+    '<div class="ecard-hdr"><span class="ecard-name">' + esc(en) + '</span>' + wc + '</div>' +
+    '<div class="vlist">' + vars + empty + '</div>' +
+    (OF[k]
+      ? afHTML(sid, en)
+      : '<button class="log-btn" onclick="openF(\'' + sid + '\',\'' + esc(en) + '\')">' +
+          '<i class="ti ti-plus" style="font-size:12px"></i> Log a result</button>'
+    ) + '</div>';
+}
+
+function sfHTML() {
+  var funnels   = ['KLS','Art Therapy','Phonics','Textured Art','Structured Morning Work'];
+  var platforms = ['OCU','AfterSell'];
+  var positions = ['Pre-Purchase','Upsell 1','Upsell 2','Upsell 3','Downsell 1','Downsell 2'];
+  return '<div class="sf-wrap"><div class="sf-title">Add funnel position</div>' +
+    '<div class="sf-grid">' +
+      '<div class="fg"><label class="flbl">Funnel</label><select onchange="NSF.funnel=this.value">' +
+        funnels.map(function(v){return '<option'+(NSF.funnel===v?' selected':'')+'>'+v+'</option>';}).join('')+'</select></div>'+
+      '<div class="fg"><label class="flbl">Platform</label><select onchange="NSF.platform=this.value">' +
+        platforms.map(function(v){return '<option'+(NSF.platform===v?' selected':'')+'>'+v+'</option>';}).join('')+'</select></div>'+
+      '<div class="fg"><label class="flbl">Position</label><select onchange="NSF.position=this.value">' +
+        positions.map(function(v){return '<option'+(NSF.position===v?' selected':'')+'>'+v+'</option>';}).join('')+'</select></div>'+
+    '</div>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button class="btn btn-primary btn-sm" onclick="addSlot()">Add</button>' +
+      '<button class="btn btn-sm" onclick="SF=false;render()">Cancel</button>' +
+    '</div></div>';
+}
+
+function render() {
+  if (!S) return;
+  var slot = gs(S.active);
+
+  var tabs = S.slots.map(function(s) {
+    return '<button class="stab'+(S.active===s.id?' on':'')+'" onclick="setSlot(\''+s.id+'\')">'+
+      esc(s.funnel)+'<span class="stab-sub">'+s.platform+'·'+s.position.replace('Pre-Purchase','Pre-P')+'</span></button>';
+  }).join('');
+
+  var main = '';
+  if (slot) {
+    var cards = Object.keys(slot.elements).map(function(en) {
+      return cardHTML(slot.id, en, slot.elements[en]);
+    }).join('');
+    var addCardOpen = AEF.hasOwnProperty(slot.id);
+    var addCard = '<div class="add-card"><div style="flex:1;display:flex">' +
+      (addCardOpen
+        ? '<div class="ae-form" style="width:100%">' +
+            '<div class="fg" style="margin-bottom:7px"><label class="flbl">Element name</label>' +
+            '<input type="text" value="'+esc(AEF[slot.id]||'')+'" placeholder="e.g. Timer · CTA Button · Badge text"' +
+            ' oninput="AEF[\''+slot.id+'\']=this.value" style="width:100%"></div>' +
+            '<div style="display:flex;gap:5px">' +
+              '<button class="btn btn-primary btn-sm" onclick="addElem(\''+slot.id+'\')">Add</button>' +
+              '<button class="btn btn-sm" onclick="delete AEF[\''+slot.id+'\'];render()">Cancel</button>' +
+            '</div></div>'
+        : '<button class="ae-btn" onclick="AEF[\''+slot.id+'\']=\'\';render()">' +
+            '<i class="ti ti-plus" style="font-size:14px"></i> Add element to track</button>'
+      ) + '</div></div>';
+
+    main = '<div class="slot-hdr"><div>' +
+        '<div class="slot-title">' + esc(slot.funnel) + ' — ' + esc(slot.platform) + ' · ' + esc(slot.position) + '</div>' +
+        '<div class="slot-sub">Current winners · what failed · what to test next</div>' +
+      '</div></div>' +
+      '<div class="legend">' +
+        '<span class="leg"><span class="lic ic-w">✓</span> Winner</span>' +
+        '<span class="leg"><span class="lic ic-f">✗</span> Failed — don\'t retest</span>' +
+        '<span class="leg"><span class="lic ic-r">↺</span> Running now</span>' +
+        '<span class="leg"><span class="lic ic-p">○</span> Planned / queue</span>' +
+        '<span class="leg"><span class="lic ic-i">~</span> Inconclusive</span>' +
+      '</div>' +
+      '<div class="egrid">' + cards + addCard + '</div>' +
+      '<div class="log-link">Activity log → your Google Sheet → <strong>Activity_Log</strong> tab &nbsp;·&nbsp; ' +
+        '<span style="cursor:pointer;text-decoration:underline" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Change backend URL</span></div>';
+  } else {
+    main = '<div class="center-msg">Select a funnel position above</div>';
+  }
+
+  document.getElementById('app').innerHTML =
+    '<div class="slot-nav">' + tabs +
+      '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add position</button>' +
+    '</div>' +
+    (SF ? sfHTML() : '') + main;
+}
+
+// ── Actions ──────────────────────────────────────────────────────────────────
+function setSlot(id)    { S.active = id; render(); }
+function openF(sid, en) { OF[fk(sid,en)] = true; render(); }
+function closeF(sid,en) { delete OF[fk(sid,en)]; delete NFV[fk(sid,en)]; render(); }
+function setF(k,f,v)    {
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'' };
+  NFV[k][f] = v;
+}
+
+function addV(sid, en) {
+  var k = fk(sid,en); var f = NFV[k]||{};
+  if (!f.value||!f.value.trim()) return;
+  var sl = gs(sid); if (!sl||!sl.elements[en]) return;
+  var nv = { id:uid(), value:f.value.trim(), rpv:parseFloat(f.rpv)||null,
+             cvr:parseFloat(f.cvr)||null, result:f.result||'fail',
+             date:f.date||'', notes:f.notes||'' };
+  sl.elements[en].variants.push(nv);
+  if (f.result === 'win') sl.elements[en].winner = f.value.trim();
+  delete OF[k]; delete NFV[k];
+  scheduleSave({ action:'Added variant', funnel:sl.funnel, position:sl.platform+' '+sl.position,
+                 element:en, value:nv.value, result:nv.result });
+  render();
+}
+
+function setWin(sid, en, vid) {
+  var sl = gs(sid); if (!sl) return;
+  var el = sl.elements[en]; if (!el) return;
+  var v  = el.variants.filter(function(x){return x.id===vid;})[0]; if (!v) return;
+  v.result  = 'win';
+  el.winner = v.value;
+  scheduleSave({ action:'Set winner', funnel:sl.funnel, position:sl.platform+' '+sl.position,
+                 element:en, value:v.value, result:'win' });
+  render();
+}
+
+function delV(sid, en, vid) {
+  var sl = gs(sid); if (!sl) return;
+  var el = sl.elements[en];
+  el.variants = el.variants.filter(function(v){return v.id!==vid;});
+  if (el.winner && !el.variants.some(function(v){return v.result==='win';})) el.winner = null;
+  scheduleSave({ action:'Deleted variant', funnel:sl.funnel, element:en });
+  render();
+}
+
+function addSlot() {
+  var id = (NSF.funnel+'-'+NSF.platform+'-'+NSF.position).toLowerCase().replace(/\s+/g,'-');
+  if (S.slots.some(function(s){return s.id===id;})) return;
+  var els = NSF.platform==='OCU'
+    ? { 'Price':{winner:null,variants:[]}, 'Image / GIF':{winner:null,variants:[]}, 'Headline / Copy':{winner:null,variants:[]}, 'Product':{winner:null,variants:[]} }
+    : { 'Price':{winner:null,variants:[]}, 'Layout':{winner:null,variants:[]},      'Headline / Copy':{winner:null,variants:[]}, 'Product':{winner:null,variants:[]} };
+  S.slots.push({ id:id, funnel:NSF.funnel, platform:NSF.platform, position:NSF.position, elements:els });
+  S.active = id; SF = false;
+  scheduleSave({ action:'Added slot', funnel:NSF.funnel, position:NSF.platform+' '+NSF.position });
+  render();
+}
+
+function addElem(sid) {
+  var name = (AEF[sid]||'').trim(); if (!name) return;
+  var sl = gs(sid); if (!sl) return;
+  if (sl.elements[name]) return;
+  sl.elements[name] = { winner:null, variants:[] };
+  delete AEF[sid];
+  scheduleSave({ action:'Added element', funnel:sl.funnel, element:name });
+  render();
+}
+</script>
+</body>
+</html>
