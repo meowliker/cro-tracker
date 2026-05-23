@@ -6,9 +6,9 @@
 var DATA_SHEET = 'CRO_Data';
 var LOG_SHEET  = 'Activity_Log';
 
-// GET  ?action=getData   → returns full tracker JSON
-// POST { data, action }  → saves data, logs action
-// GET  (no action)       → returns a simple "API is running" confirmation
+// GET  ?action=getData   -> returns full tracker JSON
+// POST { data, action }  -> saves data, logs action
+// GET  (no action)       -> serves the tracker UI as an Apps Script web app
 
 function doGet(e) {
   var action = e && e.parameter ? e.parameter.action : '';
@@ -18,10 +18,10 @@ function doGet(e) {
     return _json(data);
   }
 
-  // Health-check page (visited directly in browser)
-  return ContentService.createTextOutput(
-    '✅ CRO Tracker API is running.\n\nSet this URL in your tracker.html config.'
-  );
+  return HtmlService
+    .createHtmlOutputFromFile('tracker')
+    .setTitle('Minding Art - Upsell CRO Tracker')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function doPost(e) {
@@ -32,6 +32,15 @@ function doPost(e) {
   } catch(err) {
     return _json({ ok: false, error: err.toString() });
   }
+}
+
+// Called by tracker.html when deployed as a single Apps Script web app.
+function getData() {
+  return _read();
+}
+
+function saveData(jsonStr, actionInfo) {
+  return _write(jsonStr, actionInfo || {});
 }
 
 // ── Internal ─────────────────────────────────────────────────────────────────
@@ -75,7 +84,7 @@ function _write(jsonStr, actionInfo) {
 }
 
 function _initLog(ss) {
-  var s = ss.insertSheet(LOG_SHEET);
+  var s = ss.getSheetByName(LOG_SHEET) || ss.insertSheet(LOG_SHEET);
   s.getRange(1,1,1,8).setValues([['Timestamp','User','Action','Funnel','Position','Element','Value','Result']]);
   s.setFrozenRows(1);
   s.getRange(1,1,1,8).setFontWeight('bold');

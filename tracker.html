@@ -219,7 +219,8 @@ a{color:#1a1a18;font-weight:600}
 
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
-var SCRIPT_URL = localStorage.getItem('cro_script_url') || '';
+var HAS_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
+var SCRIPT_URL = HAS_APPS_SCRIPT ? '' : (localStorage.getItem('cro_script_url') || '');
 var S          = null;
 var OF         = {};
 var SF         = false;
@@ -230,7 +231,7 @@ var saveTimer  = null;
 
 // ── Boot ────────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
-  if (SCRIPT_URL) {
+  if (HAS_APPS_SCRIPT || SCRIPT_URL) {
     showApp();
     loadData();
   }
@@ -258,6 +259,20 @@ function showApp() {
 // ── Data ────────────────────────────────────────────────────────────────────
 function loadData() {
   setStatus('save');
+  if (HAS_APPS_SCRIPT) {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        S = data;
+        setStatus('ok');
+        render();
+      })
+      .withFailureHandler(function(e) {
+        showConnectionError(e && e.message ? e.message : String(e || 'Unknown error'));
+      })
+      .getData();
+    return;
+  }
+
   fetch(SCRIPT_URL + '?action=getData')
     .then(function(r) { return r.json(); })
     .then(function(data) {
@@ -266,12 +281,18 @@ function loadData() {
       render();
     })
     .catch(function(e) {
-      setStatus('err');
-      document.getElementById('app').innerHTML =
-        '<div class="center-msg err-msg">Could not connect to Google Sheet.<br>' +
-        '<small>' + e.message + '</small><br><br>' +
-        '<button class="btn btn-sm" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Re-configure URL</button></div>';
+      showConnectionError(e.message);
     });
+}
+
+function showConnectionError(message) {
+  setStatus('err');
+  var retry = HAS_APPS_SCRIPT
+    ? '<button class="btn btn-sm" onclick="loadData()">Retry</button>'
+    : '<button class="btn btn-sm" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Re-configure URL</button>';
+  document.getElementById('app').innerHTML =
+    '<div class="center-msg err-msg">Could not connect to Google Sheet.<br>' +
+    '<small>' + esc(message || 'Unknown error') + '</small><br><br>' + retry + '</div>';
 }
 
 function scheduleSave(action) {
@@ -281,6 +302,14 @@ function scheduleSave(action) {
 }
 
 function pushSave(action) {
+  if (HAS_APPS_SCRIPT) {
+    google.script.run
+      .withSuccessHandler(function(r) { setStatus(r.ok ? 'ok' : 'err'); })
+      .withFailureHandler(function() { setStatus('err'); })
+      .saveData(JSON.stringify(S), action || {});
+    return;
+  }
+
   fetch(SCRIPT_URL, {
     method:  'POST',
     body:    JSON.stringify({ data: JSON.stringify(S), action: action || {} }),
