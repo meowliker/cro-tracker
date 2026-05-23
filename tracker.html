@@ -378,8 +378,17 @@ function setStatus(s, detail) {
   var el  = document.getElementById('status');
   var txt = document.getElementById('status-txt');
   el.className = 'status-wrap st-' + s;
-  txt.textContent = s === 'save' ? 'Saving…' : s === 'ok' ? 'All saved' : 'Save failed — retrying';
+  txt.textContent = s === 'save'
+    ? 'Saving…'
+    : s === 'ok'
+      ? 'All saved'
+      : 'Save failed — ' + shortErr(detail || 'retrying');
   txt.title = detail || '';
+}
+
+function shortErr(detail) {
+  detail = String(detail || '').replace(/^Exception:\s*/, '');
+  return detail.length > 120 ? detail.slice(0, 117) + '...' : detail;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

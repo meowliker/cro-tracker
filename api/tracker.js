@@ -21,6 +21,8 @@ async function readBody(req) {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Content-Type', 'application/json');
+
   if (!SCRIPT_URL) {
     sendJson(res, 500, {
       ok: false,
