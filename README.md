@@ -22,12 +22,15 @@ The web app URL is the deployed tracker. No separate static hosting is required.
 
 ## Vercel Static Deployment
 
-Vercel can host the frontend only. The Google Sheet backend still has to be deployed through Apps Script first.
+Vercel can host the frontend and proxy requests to the Apps Script backend. The Google Sheet backend still has to be deployed through Apps Script first.
 
 1. Deploy `Code.gs` as an Apps Script web app using the steps above.
-2. Deploy this repo to Vercel.
-3. Open the Vercel URL.
-4. Paste the Apps Script web app URL into the setup screen.
+2. In Vercel, add an environment variable named `GOOGLE_APPS_SCRIPT_URL`.
+3. Set its value to the Apps Script web app URL, for example `https://script.google.com/macros/s/.../exec`.
+4. Redeploy this repo to Vercel.
+5. Open the Vercel URL.
+
+The browser never needs the script URL pasted into the setup screen on Vercel. `tracker.html` calls `/api/tracker`, and the Vercel API route forwards reads and writes to Apps Script using `GOOGLE_APPS_SCRIPT_URL`.
 
 This repo includes `index.html` and `vercel.json` so the Vercel root URL (`/`) opens `tracker.html` instead of showing `404: NOT_FOUND`.
 

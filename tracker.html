@@ -220,7 +220,8 @@ a{color:#1a1a18;font-weight:600}
 <script>
 // ── Config ──────────────────────────────────────────────────────────────────
 var HAS_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.script.run;
-var SCRIPT_URL = HAS_APPS_SCRIPT ? '' : (localStorage.getItem('cro_script_url') || '');
+var HAS_HOSTED_PROXY = !HAS_APPS_SCRIPT && location.protocol !== 'file:';
+var SCRIPT_URL = HAS_APPS_SCRIPT ? '' : (HAS_HOSTED_PROXY ? '/api/tracker' : (localStorage.getItem('cro_script_url') || ''));
 var S          = null;
 var OF         = {};
 var SF         = false;
@@ -231,7 +232,7 @@ var saveTimer  = null;
 
 // ── Boot ────────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
-  if (HAS_APPS_SCRIPT || SCRIPT_URL) {
+  if (HAS_APPS_SCRIPT || HAS_HOSTED_PROXY || SCRIPT_URL) {
     showApp();
     loadData();
   }
@@ -298,7 +299,7 @@ function showConnectionError(message) {
 function scheduleSave(action) {
   setStatus('save');
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(function() { pushSave(action); }, 900);
+  pushSave(action);
 }
 
 function pushSave(action) {
