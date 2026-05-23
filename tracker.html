@@ -228,7 +228,8 @@ var SF         = false;
 var AEF        = {};
 var NFV        = {};
 var NSF        = { funnel:'KLS', platform:'OCU', position:'Pre-Purchase' };
-var saveTimer  = null;
+var saveInFlight = false;
+var pendingSaveAction = null;
 
 // ── Boot ────────────────────────────────────────────────────────────────────
 window.addEventListener('load', function() {
@@ -237,6 +238,12 @@ window.addEventListener('load', function() {
     loadData();
   }
   // if no URL: setup screen is already visible by default
+});
+
+window.addEventListener('beforeunload', function(e) {
+  if (!saveInFlight && !pendingSaveAction) return;
+  e.preventDefault();
+  e.returnValue = '';
 });
 
 function saveUrl() {
@@ -297,28 +304,57 @@ function showConnectionError(message) {
 }
 
 function scheduleSave(action) {
+  pendingSaveAction = action || {};
+  flushSave();
+}
+
+function flushSave() {
+  if (saveInFlight || !pendingSaveAction) return;
+
+  var action = pendingSaveAction;
+  pendingSaveAction = null;
+  saveInFlight = true;
   setStatus('save');
-  clearTimeout(saveTimer);
-  pushSave(action);
+
+  pushSave(action)
+    .then(function(r) {
+      saveInFlight = false;
+      if (r && r.ok === false) {
+        pendingSaveAction = action;
+        setStatus('err');
+        setTimeout(flushSave, 3000);
+        return;
+      }
+      if (pendingSaveAction) flushSave();
+      else setStatus('ok');
+    })
+    .catch(function() {
+      saveInFlight = false;
+      pendingSaveAction = action;
+      setStatus('err');
+      setTimeout(flushSave, 3000);
+    });
 }
 
 function pushSave(action) {
   if (HAS_APPS_SCRIPT) {
-    google.script.run
-      .withSuccessHandler(function(r) { setStatus(r.ok ? 'ok' : 'err'); })
-      .withFailureHandler(function() { setStatus('err'); })
-      .saveData(JSON.stringify(S), action || {});
-    return;
+    return new Promise(function(resolve, reject) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .saveData(JSON.stringify(S), action || {});
+    });
   }
 
-  fetch(SCRIPT_URL, {
+  return fetch(SCRIPT_URL, {
     method:  'POST',
     body:    JSON.stringify({ data: JSON.stringify(S), action: action || {} }),
     headers: { 'Content-Type': 'application/json' }
   })
-  .then(function(r) { return r.json(); })
-  .then(function(r) { setStatus(r.ok ? 'ok' : 'err'); })
-  .catch(function()  { setStatus('err'); });
+  .then(function(r) {
+    if (!r.ok) throw new Error('Save failed with status ' + r.status);
+    return r.json();
+  });
 }
 
 function setStatus(s) {
