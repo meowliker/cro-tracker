@@ -26,6 +26,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-seri
 .store-danger{color:#c42b2b}
 .store-danger:hover{background:#fce8e8}
 .status-wrap{display:flex;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}
+.top-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.nav-toggle{border:1px solid #ddd;background:#fff;border-radius:18px;padding:5px 10px;font-family:inherit;font-size:11px;color:#555;display:flex;align-items:center;gap:5px;cursor:pointer}
+.nav-toggle:hover{background:#f5f5f3}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
 .st-ok   .status-dot{background:#4caf50}
 .st-ok   .status-txt{color:#3d8b40}
@@ -60,6 +63,10 @@ a{color:#1a1a18;font-weight:600}
 
 /* ─── Main layout ─────────────────────────────────────────────── */
 .wrap{max-width:920px;margin:0 auto;padding:20px 16px}
+.wrap.with-sidebar{max-width:1360px}
+.tracker-layout{display:grid;grid-template-columns:minmax(0,920px) 360px;gap:18px;align-items:start}
+.tracker-main{min-width:0}
+@media(max-width:980px){.tracker-layout{grid-template-columns:1fr}.wrap.with-sidebar{max-width:920px}}
 
 /* ─── Slot nav ────────────────────────────────────────────────── */
 .slot-nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
@@ -174,6 +181,26 @@ a{color:#1a1a18;font-weight:600}
 
 /* ─── Log link ────────────────────────────────────────────────── */
 .log-link{font-size:11px;color:#bbb;text-align:right;margin-top:14px;padding-top:14px;border-top:1px solid #ebebea}
+
+/* ─── Decision sidebar ───────────────────────────────────────── */
+.decision-sidebar{background:#fff;border:1px solid #e8e8e5;border-radius:12px;overflow:hidden;position:sticky;top:74px}
+.ds-head{padding:12px;border-bottom:1px solid #f2f2f0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;background:#fafaf8}
+.ds-title{font-size:12px;font-weight:700}
+.ds-sub{font-size:10px;color:#aaa;margin-top:2px}
+.ds-count{font-size:10px;color:#777;background:#f0f0ee;border-radius:14px;padding:2px 7px;white-space:nowrap}
+.ds-filters{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;border-bottom:1px solid #f2f2f0}
+.ds-filters .fg{gap:2px}
+.ds-list{max-height:calc(100vh - 245px);overflow:auto}
+.ds-empty{padding:24px 14px;text-align:center;color:#bbb;font-size:12px}
+.decision-item{padding:10px 12px;border-bottom:1px solid #f5f5f3}
+.decision-item:last-child{border-bottom:none}
+.decision-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
+.decision-product{font-size:12px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.decision-meta{font-size:10px;color:#999;display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
+.decision-el{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:3px}
+.decision-value{font-size:12px;color:#333;line-height:1.35;word-break:break-word}
+.decision-dates{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px;font-size:10px;color:#999}
+.decision-dates strong{color:#666;font-weight:600}
 </style>
 </head>
 <body>
@@ -188,9 +215,12 @@ a{color:#1a1a18;font-weight:600}
     <span class="logo-sub">Upsell CRO Tracker</span>
     <div class="store-menu" id="store-menu" style="display:none"></div>
   </div>
-  <div class="status-wrap st-ok" id="status">
-    <span class="status-dot"></span>
-    <span class="status-txt" id="status-txt">All saved</span>
+  <div class="top-actions">
+    <button class="nav-toggle" id="decision-toggle" onclick="toggleDecisionSidebar()"><i class="ti ti-layout-sidebar-right"></i><span>Hide results</span></button>
+    <div class="status-wrap st-ok" id="status">
+      <span class="status-dot"></span>
+      <span class="status-txt" id="status-txt">All saved</span>
+    </div>
   </div>
 </div>
 
@@ -275,6 +305,8 @@ var S          = null;
 var STORES     = [];
 var ACTIVE_STORE_ID = localStorage.getItem('cro_store_id') || '';
 var STORE_MENU = false;
+var DECISION_SIDEBAR = localStorage.getItem('cro_decision_sidebar') !== '0';
+var DECISION_FILTERS = { product:'all', platform:'all', position:'all', result:'all' };
 var OF         = {};
 var SF         = false;
 var AEF        = {};
@@ -316,6 +348,7 @@ function showApp() {
   document.getElementById('setup').style.display = 'none';
   document.getElementById('topbar').style.display = 'flex';
   document.getElementById('app').style.display    = 'block';
+  syncDecisionToggle();
 }
 
 // ── Data ────────────────────────────────────────────────────────────────────
@@ -463,6 +496,18 @@ function setStatus(s, detail) {
       ? 'All saved'
       : 'Save failed — ' + shortErr(detail || 'retrying');
   txt.title = detail || '';
+}
+
+function toggleDecisionSidebar() {
+  DECISION_SIDEBAR = !DECISION_SIDEBAR;
+  localStorage.setItem('cro_decision_sidebar', DECISION_SIDEBAR ? '1' : '0');
+  render();
+}
+
+function syncDecisionToggle() {
+  var btn = document.getElementById('decision-toggle');
+  if (!btn) return;
+  btn.innerHTML = '<i class="ti ti-layout-sidebar-right"></i><span>' + (DECISION_SIDEBAR ? 'Hide results' : 'Show results') + '</span>';
 }
 
 function shortErr(detail) {
@@ -714,6 +759,121 @@ function ic(r) {
   return m[r] || m.planned;
 }
 
+function selectHTML(value, options, onchange) {
+  return '<select onchange="' + onchange + '">' + options.map(function(opt) {
+    return '<option value="' + esc(opt.value) + '"' + (value === opt.value ? ' selected' : '') + '>' + esc(opt.label) + '</option>';
+  }).join('') + '</select>';
+}
+
+function setDecisionFilter(key, value) {
+  DECISION_FILTERS[key] = value;
+  if (key === 'platform' && value !== 'AfterSell') DECISION_FILTERS.position = 'all';
+  render();
+}
+
+function dateLabel(date) {
+  return date ? String(date).slice(5) : '—';
+}
+
+function resultLabel(result) {
+  return { win:'Winner', fail:'Failed', running:'Running', planned:'Planned', inconclusive:'Inconclusive' }[result] || result || 'Planned';
+}
+
+function collectDecisions() {
+  var rows = [];
+  if (!isProductMode()) return rows;
+  (S.products || []).forEach(function(product) {
+    ensureProductStructure(product);
+    Object.keys(product.platforms || {}).forEach(function(platform) {
+      Object.keys(product.platforms[platform].positions || {}).forEach(function(position) {
+        var elements = product.platforms[platform].positions[position].elements || {};
+        Object.keys(elements).forEach(function(elementName) {
+          var variants = elements[elementName].variants || [];
+          var dated = variants.map(function(v) { return v.date || ''; }).filter(Boolean).sort();
+          var startDate = dated[0] || '';
+          variants.forEach(function(v) {
+            if (['win','fail','inconclusive'].indexOf(v.result) === -1) return;
+            rows.push({
+              productId: product.id,
+              product: product.name,
+              platform: platform,
+              position: position,
+              element: elementName,
+              value: v.value || '',
+              result: v.result || 'planned',
+              startDate: startDate || v.date || '',
+              decisionDate: v.date || '',
+              notes: v.notes || ''
+            });
+          });
+        });
+      });
+    });
+  });
+  rows.sort(function(a, b) {
+    return String(b.decisionDate || '').localeCompare(String(a.decisionDate || ''));
+  });
+  return rows;
+}
+
+function filteredDecisions(rows) {
+  return rows.filter(function(row) {
+    if (DECISION_FILTERS.product !== 'all' && row.productId !== DECISION_FILTERS.product) return false;
+    if (DECISION_FILTERS.platform !== 'all' && row.platform !== DECISION_FILTERS.platform) return false;
+    if (DECISION_FILTERS.position !== 'all' && row.position !== DECISION_FILTERS.position) return false;
+    if (DECISION_FILTERS.result !== 'all' && row.result !== DECISION_FILTERS.result) return false;
+    return true;
+  });
+}
+
+function decisionSidebarHTML() {
+  if (!DECISION_SIDEBAR || !isProductMode()) return '';
+  var rows = collectDecisions();
+  var filtered = filteredDecisions(rows);
+  var products = (S.products || []).map(function(product) { return { value:product.id, label:product.name }; });
+  var productOptions = [{ value:'all', label:'All products' }].concat(products);
+  var platformOptions = [
+    { value:'all', label:'All platforms' },
+    { value:'OCU', label:'OCU' },
+    { value:'AfterSell', label:'AfterSell' }
+  ];
+  var positionOptions = [{ value:'all', label:'All steps' }, { value:'Pre-Purchase', label:'OCU Pre-Purchase' }]
+    .concat(AFTERSELL_POSITIONS.map(function(pos) { return { value:pos, label:pos }; }));
+  var resultOptions = [
+    { value:'all', label:'All decisions' },
+    { value:'win', label:'Winner' },
+    { value:'fail', label:'Failed' },
+    { value:'inconclusive', label:'Inconclusive' }
+  ];
+  var items = filtered.map(function(row) {
+    return '<div class="decision-item">' +
+      '<div class="decision-top">' + ic(row.result) + '<div class="decision-product">' + esc(row.product) + '</div></div>' +
+      '<div class="decision-meta"><span>' + esc(row.platform) + '</span><span>·</span><span>' + esc(row.position) + '</span><span>·</span><span>' + esc(resultLabel(row.result)) + '</span></div>' +
+      '<div class="decision-el">' + esc(row.element) + '</div>' +
+      '<div class="decision-value">' + esc(row.value || row.notes || 'Untitled result') + '</div>' +
+      '<div class="decision-dates"><span><strong>Start</strong> ' + esc(dateLabel(row.startDate)) + '</span><span><strong>Decision</strong> ' + esc(dateLabel(row.decisionDate)) + '</span></div>' +
+    '</div>';
+  }).join('');
+  return '<aside class="decision-sidebar">' +
+    '<div class="ds-head"><div><div class="ds-title">Decided results</div><div class="ds-sub">' + esc(activeStore().name || 'Current store') + '</div></div><span class="ds-count">' + filtered.length + '/' + rows.length + '</span></div>' +
+    '<div class="ds-filters">' +
+      '<div class="fg"><label class="flbl">Product</label>' + selectHTML(DECISION_FILTERS.product, productOptions, "setDecisionFilter('product',this.value)") + '</div>' +
+      '<div class="fg"><label class="flbl">Platform</label>' + selectHTML(DECISION_FILTERS.platform, platformOptions, "setDecisionFilter('platform',this.value)") + '</div>' +
+      '<div class="fg"><label class="flbl">Step</label>' + selectHTML(DECISION_FILTERS.position, positionOptions, "setDecisionFilter('position',this.value)") + '</div>' +
+      '<div class="fg"><label class="flbl">Decision</label>' + selectHTML(DECISION_FILTERS.result, resultOptions, "setDecisionFilter('result',this.value)") + '</div>' +
+    '</div>' +
+    '<div class="ds-list">' + (items || '<div class="ds-empty">No decided results match these filters.</div>') + '</div>' +
+  '</aside>';
+}
+
+function productLayoutHTML(main) {
+  syncDecisionToggle();
+  var app = document.getElementById('app');
+  if (app) app.className = DECISION_SIDEBAR && isProductMode() ? 'wrap with-sidebar' : 'wrap';
+  if (!DECISION_SIDEBAR) return '<div class="tracker-main">' + main + '</div>';
+  return '<div class="tracker-layout"><div class="tracker-main">' + main + '</div>' + decisionSidebarHTML() + '</div>';
+}
+
 // ── Render ───────────────────────────────────────────────────────────────────
 function varHTML(v, sid, en) {
   var k = fk(sid, en);
@@ -851,10 +1011,12 @@ function renderProductMode() {
 
   if (!products.length) {
     document.getElementById('app').innerHTML =
-      '<div class="slot-nav">' +
-        '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add product</button>' +
-      '</div>' +
-      (SF ? addProductHTML() : '<div class="center-msg">Add your first product to start tracking OCU and AfterSell tests.</div>');
+      productLayoutHTML(
+        '<div class="slot-nav">' +
+          '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add product</button>' +
+        '</div>' +
+        (SF ? addProductHTML() : '<div class="center-msg">Add your first product to start tracking OCU and AfterSell tests.</div>')
+      );
     return;
   }
 
@@ -890,7 +1052,7 @@ function renderProductMode() {
           '<i class="ti ti-plus" style="font-size:14px"></i> Add element to track</button>'
     ) + '</div></div>';
 
-  document.getElementById('app').innerHTML =
+  var mainHTML =
     '<div class="slot-nav">' + tabs +
       '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add product</button>' +
     '</div>' +
@@ -913,11 +1075,14 @@ function renderProductMode() {
     '<div class="egrid">' + cards + addCard + '</div>' +
     '<div class="log-link">Activity log → your Google Sheet → <strong>Activity_Log</strong> tab &nbsp;·&nbsp; ' +
       '<span style="cursor:pointer;text-decoration:underline" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Change backend URL</span></div>';
+  document.getElementById('app').innerHTML = productLayoutHTML(mainHTML);
 }
 
 function render() {
   if (!S) return;
   if (isProductMode()) { renderProductMode(); return; }
+  document.getElementById('app').className = 'wrap';
+  syncDecisionToggle();
   var slot = gs(S.active);
 
   var tabs = S.slots.map(function(s) {
