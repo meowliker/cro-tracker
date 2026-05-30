@@ -134,6 +134,11 @@ a{color:#1a1a18;font-weight:600}
 .drop-img img{width:44px;height:44px;border-radius:7px;border:1px solid #e8e8e5;object-fit:cover;background:#f8f8f6}
 .drop-rm{position:absolute;right:-5px;top:-5px;width:16px;height:16px;border-radius:50%;border:1px solid #e8e8e5;background:#fff;color:#999;cursor:pointer;font-size:10px;line-height:1}
 .drop-rm:hover{background:#fce8e8;color:#c42b2b}
+.img-preview{position:fixed;inset:0;background:rgba(20,20,18,.72);z-index:300;display:none;align-items:center;justify-content:center;padding:28px}
+.img-preview.on{display:flex}
+.img-preview-box{position:relative;max-width:min(960px,92vw);max-height:88vh}
+.img-preview-box img{display:block;max-width:100%;max-height:88vh;border-radius:8px;background:#fff;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.img-preview-close{position:absolute;right:-10px;top:-10px;width:28px;height:28px;border-radius:50%;border:1px solid #ddd;background:#fff;color:#333;cursor:pointer;font-size:16px;line-height:1}
 
 /* ─── Add-slot form ───────────────────────────────────────────── */
 .sf-wrap{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:16px;margin-bottom:14px}
@@ -234,6 +239,13 @@ a{color:#1a1a18;font-weight:600}
 <!-- ── Main app ───────────────────────────────────────────────────────────── -->
 <div class="wrap" id="app" style="display:none">
   <div class="center-msg"><div class="spinner"></div>Loading tracker…</div>
+</div>
+
+<div class="img-preview" id="img-preview" onclick="hideImgPreview()">
+  <div class="img-preview-box" onclick="event.stopPropagation()">
+    <button class="img-preview-close" onclick="hideImgPreview()">✕</button>
+    <img id="img-preview-img" alt="Preview">
+  </div>
 </div>
 
 <script>
@@ -421,6 +433,8 @@ function esc(s)  {
 }
 function jsq(s)  { return esc(s).replace(/'/g,'&#39;'); }
 function today() { return new Date().toISOString().slice(0,10); }
+function imgSrc(img) { return img.url || img.thumbUrl || img.data || ''; }
+function imgPreviewSrc(img) { return img.url || img.thumbUrl || img.data || img.previewUrl || ''; }
 
 function ic(r) {
   var m = { win:'<span class="vic ic-w">✓</span>', fail:'<span class="vic ic-f">✗</span>',
@@ -436,7 +450,8 @@ function varHTML(v, sid, en) {
   var dt   = v.date ? v.date.slice(5) : '';
   var xout = v.result === 'fail' ? ' xout' : '';
   var imgs = (v.images || []).map(function(img) {
-    return '<a href="' + esc(img.url || img.data) + '" target="_blank"><img class="vthumb" src="' + esc(img.url || img.data) + '" title="' + esc(img.name || 'Attached image') + '"></a>';
+    return '<button class="vbtn" title="Preview image" onclick="showImgPreview(\'' + jsq(imgPreviewSrc(img)) + '\')">' +
+      '<img class="vthumb" src="' + esc(imgSrc(img)) + '" alt="' + esc(img.name || 'Attached image') + '"></button>';
   }).join('');
   var wbtn = v.result !== 'win'
     ? '<button class="vbtn vbtn-w" onclick="setWin(\'' + sid + '\',\'' + jsq(en) + '\',\'' + v.id + '\')">Set winner</button>'
@@ -471,7 +486,7 @@ function afHTML(sid, en) {
     return '<option' + (f.result === r ? ' selected' : '') + '>' + r + '</option>';
   }).join('');
   var imgs = (f.images || []).map(function(img, i) {
-    return '<span class="drop-img"><img src="' + esc(img.url || img.data) + '" title="' + esc(img.name || 'Attached image') + '">' +
+    return '<span class="drop-img"><img src="' + esc(imgSrc(img)) + '" title="' + esc(img.name || 'Attached image') + '" onclick="showImgPreview(\'' + jsq(imgPreviewSrc(img)) + '\')">' +
       '<button class="drop-rm" onclick="rmImg(\'' + k + '\',' + i + ')" title="Remove image">✕</button></span>';
   }).join('');
   return '<div class="aform">' +
@@ -655,15 +670,28 @@ function rmImg(k, idx) {
   render();
 }
 
+function showImgPreview(src) {
+  if (!src) return;
+  document.getElementById('img-preview-img').src = src;
+  document.getElementById('img-preview').className = 'img-preview on';
+}
+
+function hideImgPreview() {
+  document.getElementById('img-preview').className = 'img-preview';
+  document.getElementById('img-preview-img').src = '';
+}
+
 function addV(sid, en) {
   var k = fk(sid,en); var f = NFV[k]||{};
-  if (!f.value||!f.value.trim()) return;
+  var value = f.value && f.value.trim()
+    ? f.value.trim()
+    : ((f.notes && f.notes.trim()) || ((f.images && f.images[0] && f.images[0].name) || 'Image attachment'));
   var sl = gs(sid); if (!sl||!sl.elements[en]) return;
-  var nv = { id:uid(), value:f.value.trim(), rpv:parseFloat(f.rpv)||null,
+  var nv = { id:uid(), value:value, rpv:parseFloat(f.rpv)||null,
              cvr:parseFloat(f.cvr)||null, result:f.result||'fail',
              date:f.date||'', notes:f.notes||'', images:f.images||[] };
   sl.elements[en].variants.push(nv);
-  if (f.result === 'win') sl.elements[en].winner = f.value.trim();
+  if (f.result === 'win') sl.elements[en].winner = value;
   delete OF[k]; delete NFV[k];
   scheduleSave({ action:'Added variant', funnel:sl.funnel, position:sl.platform+' '+sl.position,
                  element:en, value:nv.value, result:nv.result });
@@ -691,12 +719,14 @@ function editV(sid, en, vid) {
 
 function saveV(sid, en) {
   var k = fk(sid,en); var f = NFV[k]||{};
-  if (!f.value||!f.value.trim()) return;
+  var value = f.value && f.value.trim()
+    ? f.value.trim()
+    : ((f.notes && f.notes.trim()) || ((f.images && f.images[0] && f.images[0].name) || 'Image attachment'));
   var sl = gs(sid); if (!sl||!sl.elements[en]) return;
   var el = sl.elements[en];
   var v = el.variants.filter(function(x){return x.id===EVF[k];})[0]; if (!v) return;
   var oldValue = v.value;
-  v.value = f.value.trim();
+  v.value = value;
   v.rpv = parseFloat(f.rpv)||null;
   v.cvr = parseFloat(f.cvr)||null;
   v.result = f.result||'fail';

@@ -166,7 +166,8 @@ function _uploadImage(image) {
       image: {
         id: file.getId(),
         name: name,
-        url: 'https://drive.google.com/uc?export=view&id=' + file.getId()
+        url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1200',
+        previewUrl: 'https://drive.google.com/file/d/' + file.getId() + '/view'
       }
     };
   } catch(e) { return { ok: false, error: e.toString() }; }
