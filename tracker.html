@@ -305,8 +305,10 @@ function loadData() {
     google.script.run
       .withSuccessHandler(function(data) {
         S = data;
+        var normalized = normalizeAttachmentRows();
         setStatus('ok');
         render();
+        if (normalized) scheduleSave({ action:'Merged image attachments' });
       })
       .withFailureHandler(function(e) {
         showConnectionError(e && e.message ? e.message : String(e || 'Unknown error'));
@@ -320,8 +322,10 @@ function loadData() {
     .then(function(data) {
       if (data && data.ok === false) throw new Error(data.error || 'Backend returned an error');
       S = data;
+      var normalized = normalizeAttachmentRows();
       setStatus('ok');
       render();
+      if (normalized) scheduleSave({ action:'Merged image attachments' });
     })
     .catch(function(e) {
       showConnectionError(e.message);
@@ -442,6 +446,33 @@ function attachmentLabel(v) {
     v.value === 'Image attachment' ||
     v.images.some(function(img) { return img.name === v.value; })
   );
+}
+
+function imageOnlyVariant(v) {
+  return attachmentLabel(v) && !v.rpv && !v.cvr;
+}
+
+function normalizeAttachmentRows() {
+  if (!S || !S.slots) return false;
+  var changed = false;
+  S.slots.forEach(function(slot) {
+    Object.keys(slot.elements || {}).forEach(function(en) {
+      var el = slot.elements[en];
+      if (!el || !el.variants || el.variants.length < 2) return;
+      var merged = [];
+      el.variants.forEach(function(v) {
+        var prev = merged[merged.length - 1];
+        if (prev && imageOnlyVariant(v)) {
+          prev.images = (prev.images || []).concat(v.images || []);
+          changed = true;
+        } else {
+          merged.push(v);
+        }
+      });
+      el.variants = merged;
+    });
+  });
+  return changed;
 }
 
 function ic(r) {
@@ -694,10 +725,20 @@ function hideImgPreview() {
 
 function addV(sid, en) {
   var k = fk(sid,en); var f = NFV[k]||{};
+  var sl = gs(sid); if (!sl||!sl.elements[en]) return;
+  var el = sl.elements[en];
+  if ((!f.value || !f.value.trim()) && (!f.notes || !f.notes.trim()) && f.images && f.images.length && el.variants.length) {
+    var last = el.variants[el.variants.length - 1];
+    last.images = (last.images || []).concat(f.images);
+    delete OF[k]; delete NFV[k];
+    scheduleSave({ action:'Added image attachment', funnel:sl.funnel, position:sl.platform+' '+sl.position,
+                   element:en, value:last.value, result:last.result });
+    render();
+    return;
+  }
   var value = f.value && f.value.trim()
     ? f.value.trim()
     : ((f.notes && f.notes.trim()) || 'Image attachment');
-  var sl = gs(sid); if (!sl||!sl.elements[en]) return;
   var nv = { id:uid(), value:value, rpv:parseFloat(f.rpv)||null,
              cvr:parseFloat(f.cvr)||null, result:f.result||'fail',
              date:f.date||'', notes:f.notes||'', images:f.images||[] };
