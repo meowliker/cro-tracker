@@ -209,6 +209,8 @@ a{color:#1a1a18;font-weight:600}
 .decision-badge.inconclusive{background:#fff3c4;color:#8a6200}
 .decision-dates{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px;font-size:10px;color:#999}
 .decision-dates strong{color:#666;font-weight:600}
+.decision-actions{display:flex;margin-top:8px}
+.decision-actions .btn{font-size:10px;padding:4px 9px}
 .detail-body{background:#fff;border-radius:10px;max-width:min(620px,92vw);max-height:88vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.35)}
 .detail-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:16px;border-bottom:1px solid #eee}
 .detail-title{font-size:16px;font-weight:700;margin-bottom:4px}
@@ -802,6 +804,14 @@ function resultLabel(result) {
   return { win:'Winner', fail:'Loser', running:'Running', planned:'Planned', inconclusive:'Inconclusive' }[result] || result || 'Planned';
 }
 
+function isDecidedResult(result) {
+  return ['win','fail','inconclusive'].indexOf(result) !== -1;
+}
+
+function decisionId(productId, platform, position, elementName, variantId) {
+  return [productId, platform, position, elementName, variantId].join('|');
+}
+
 function collectDecisions() {
   var rows = [];
   if (!isProductMode()) return rows;
@@ -815,9 +825,9 @@ function collectDecisions() {
           var dated = variants.map(function(v) { return v.date || ''; }).filter(Boolean).sort();
           var startDate = dated[0] || '';
           variants.forEach(function(v) {
-            if (['win','fail','inconclusive'].indexOf(v.result) === -1) return;
+            if (!isDecidedResult(v.result)) return;
             rows.push({
-              id: product.id + '|' + platform + '|' + position + '|' + elementName + '|' + v.id,
+              id: decisionId(product.id, platform, position, elementName, v.id),
               productId: product.id,
               product: product.name,
               platform: platform,
@@ -881,6 +891,7 @@ function decisionSidebarHTML() {
       '<div class="decision-meta"><span>' + esc(row.platform) + '</span><span>·</span><span>' + esc(row.position) + '</span></div>' +
       '<span class="decision-badge ' + esc(row.result) + '">' + esc(resultLabel(row.result)) + '</span>' +
       '<div class="decision-dates"><span><strong>Start</strong> ' + esc(dateLabel(row.startDate)) + '</span><span><strong>Decision</strong> ' + esc(dateLabel(row.decisionDate)) + '</span></div>' +
+      '<div class="decision-actions"><button class="btn btn-sm" onclick="addBackDecision(\'' + jsq(row.id) + '\')"><i class="ti ti-arrow-back-up"></i> Add Back</button></div>' +
     '</div>';
   }).join('');
   return '<aside class="decision-sidebar">' +
@@ -982,11 +993,13 @@ function afHTML(sid, en) {
 
 function cardHTML(sid, en, ed) {
   var k    = fk(sid, en);
-  var wc   = ed.winner
-    ? '<span class="win-chip" title="' + esc(ed.winner) + '">' + esc(ed.winner.length > 22 ? ed.winner.slice(0,22) + '…' : ed.winner) + '</span>'
+  var activeVariants = ed.variants.filter(function(v) { return !isDecidedResult(v.result); });
+  var activeWinner = activeVariants.filter(function(v) { return v.result === 'win'; })[0];
+  var wc   = activeWinner
+    ? '<span class="win-chip" title="' + esc(activeWinner.value) + '">' + esc(activeWinner.value.length > 22 ? activeWinner.value.slice(0,22) + '…' : activeWinner.value) + '</span>'
     : '<span class="no-win">No winner yet</span>';
-  var vars  = ed.variants.map(function(v) { return varHTML(v, sid, en); }).join('');
-  var empty = !ed.variants.length ? '<div class="vempty">Nothing tested yet</div>' : '';
+  var vars  = activeVariants.map(function(v) { return varHTML(v, sid, en); }).join('');
+  var empty = !activeVariants.length ? '<div class="vempty">' + (ed.variants.length ? 'No active tests' : 'Nothing tested yet') + '</div>' : '';
   return '<div class="ecard">' +
     '<div class="ecard-hdr"><span class="ecard-name">' + esc(en) + '</span>' +
       '<span class="ecard-meta">' + wc +
@@ -1280,6 +1293,45 @@ function showDecisionInfo(id) {
 function hideDecisionInfo() {
   document.getElementById('detail-preview').className = 'img-preview';
   document.getElementById('detail-body').innerHTML = '';
+}
+
+function decisionTarget(id) {
+  if (!isProductMode()) return null;
+  var found = null;
+  (S.products || []).some(function(product) {
+    ensureProductStructure(product);
+    return Object.keys(product.platforms || {}).some(function(platform) {
+      return Object.keys(product.platforms[platform].positions || {}).some(function(position) {
+        var elements = product.platforms[platform].positions[position].elements || {};
+        return Object.keys(elements).some(function(elementName) {
+          var el = elements[elementName];
+          var variant = (el.variants || []).filter(function(v) {
+            return decisionId(product.id, platform, position, elementName, v.id) === id;
+          })[0];
+          if (!variant) return false;
+          found = { product:product, platform:platform, position:position, elementName:elementName, element:el, variant:variant };
+          return true;
+        });
+      });
+    });
+  });
+  return found;
+}
+
+function addBackDecision(id) {
+  var target = decisionTarget(id);
+  if (!target) return;
+  target.variant.result = 'running';
+  if (target.element.winner === target.variant.value) {
+    var nextWinner = (target.element.variants || []).filter(function(v) { return v.result === 'win'; })[0];
+    target.element.winner = nextWinner ? nextWinner.value : null;
+  }
+  S.activeProductId = target.product.id;
+  S.activePlatform = target.platform;
+  if (target.platform === 'AfterSell') target.product.platforms.AfterSell.activePosition = target.position;
+  S.activePosition = target.position;
+  scheduleSave({ action:'Added result back', store:activeStore().name, value:target.variant.value, result:'running' });
+  render();
 }
 
 function addV(sid, en) {
