@@ -51,6 +51,11 @@ function uploadImage(image) {
   return _uploadImage(image || {});
 }
 
+function authDriveTest() {
+  var folder = _imageFolder();
+  Logger.log(folder.getName());
+}
+
 // ── Internal ─────────────────────────────────────────────────────────────────
 
 function _json(obj) {
