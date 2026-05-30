@@ -33,7 +33,11 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const upstream = await fetch(`${SCRIPT_URL}?action=getData`);
+      const reqUrl = new URL(req.url, 'http://localhost');
+      const params = new URLSearchParams({ action: 'getData' });
+      const storeId = reqUrl.searchParams.get('storeId');
+      if (storeId) params.set('storeId', storeId);
+      const upstream = await fetch(`${SCRIPT_URL}?${params.toString()}`);
       const text = await upstream.text();
       res.status(upstream.status).send(text);
       return;

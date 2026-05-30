@@ -14,6 +14,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-seri
 .topbar{background:#fff;border-bottom:1px solid #e8e8e5;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:54px;position:sticky;top:0;z-index:100;gap:12px}
 .logo{font-size:14px;font-weight:700;letter-spacing:-.01em;white-space:nowrap}
 .logo-sub{font-size:11px;font-weight:400;color:#999;margin-left:8px}
+.store-wrap{position:relative;display:flex;align-items:center;gap:8px}
+.store-btn{border:none;background:transparent;color:#1a1a18;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px}
+.store-btn:hover{background:#f5f5f3}
+.store-menu{position:absolute;top:36px;left:0;min-width:210px;background:#fff;border:1px solid #e2e2df;border-radius:8px;box-shadow:0 14px 35px rgba(0,0,0,.12);padding:5px;z-index:200}
+.store-item{width:100%;border:none;background:transparent;text-align:left;font-family:inherit;font-size:12px;padding:8px 9px;border-radius:6px;cursor:pointer;color:#333;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.store-item:hover{background:#f5f5f3}
+.store-item.on{font-weight:700;background:#f0f0ee}
+.store-add{border-top:1px solid #eee;margin-top:4px;padding-top:5px}
+.store-check{font-size:11px;color:#3d8b40}
 .status-wrap{display:flex;align-items:center;gap:8px;font-size:11px;color:#888;flex-shrink:0}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#ccc;flex-shrink:0;transition:background .3s}
 .st-ok   .status-dot{background:#4caf50}
@@ -168,9 +177,13 @@ a{color:#1a1a18;font-weight:600}
 
 <!-- ── Top bar ───────────────────────────────────────────────────────────── -->
 <div class="topbar" id="topbar" style="display:none">
-  <div>
-    <span class="logo">Minding Art</span>
+  <div class="store-wrap">
+    <button class="store-btn" onclick="toggleStoreMenu()">
+      <span id="store-name">Minding Art</span>
+      <i class="ti ti-chevron-down" style="font-size:13px"></i>
+    </button>
     <span class="logo-sub">Upsell CRO Tracker</span>
+    <div class="store-menu" id="store-menu" style="display:none"></div>
   </div>
   <div class="status-wrap st-ok" id="status">
     <span class="status-dot"></span>
@@ -256,6 +269,9 @@ var HAS_APPS_SCRIPT = typeof google !== 'undefined' && google.script && google.s
 var HAS_HOSTED_PROXY = !HAS_APPS_SCRIPT && location.protocol !== 'file:';
 var SCRIPT_URL = HAS_APPS_SCRIPT ? '' : (HAS_HOSTED_PROXY ? '/api/tracker' : (localStorage.getItem('cro_script_url') || ''));
 var S          = null;
+var STORES     = [];
+var ACTIVE_STORE_ID = localStorage.getItem('cro_store_id') || '';
+var STORE_MENU = false;
 var OF         = {};
 var SF         = false;
 var AEF        = {};
@@ -304,7 +320,7 @@ function loadData() {
   if (HAS_APPS_SCRIPT) {
     google.script.run
       .withSuccessHandler(function(data) {
-        S = data;
+        receivePayload(data);
         var normalized = normalizeAttachmentRows();
         setStatus('ok');
         render();
@@ -313,15 +329,15 @@ function loadData() {
       .withFailureHandler(function(e) {
         showConnectionError(e && e.message ? e.message : String(e || 'Unknown error'));
       })
-      .getData();
+      .getData(ACTIVE_STORE_ID);
     return;
   }
 
-  fetch(SCRIPT_URL + '?action=getData')
+  fetch(dataEndpoint())
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data && data.ok === false) throw new Error(data.error || 'Backend returned an error');
-      S = data;
+      receivePayload(data);
       var normalized = normalizeAttachmentRows();
       setStatus('ok');
       render();
@@ -330,6 +346,27 @@ function loadData() {
     .catch(function(e) {
       showConnectionError(e.message);
     });
+}
+
+function dataEndpoint() {
+  var sep = SCRIPT_URL.indexOf('?') === -1 ? '?' : '&';
+  var url = SCRIPT_URL + sep + 'action=getData';
+  if (ACTIVE_STORE_ID) url += '&storeId=' + encodeURIComponent(ACTIVE_STORE_ID);
+  return url;
+}
+
+function receivePayload(data) {
+  if (data && data.tracker) {
+    STORES = data.stores || [];
+    ACTIVE_STORE_ID = data.activeStoreId || (STORES[0] && STORES[0].id) || '';
+    if (ACTIVE_STORE_ID) localStorage.setItem('cro_store_id', ACTIVE_STORE_ID);
+    S = data.tracker;
+  } else {
+    S = data;
+    if (!STORES.length) STORES = [{ id:'minding-art', name:'Minding Art' }];
+    ACTIVE_STORE_ID = ACTIVE_STORE_ID || STORES[0].id;
+  }
+  renderStoreName();
 }
 
 function showConnectionError(message) {
@@ -381,7 +418,7 @@ function pushSave(action) {
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-        .saveData(JSON.stringify(S), action || {});
+        .saveData(JSON.stringify(S), action || {}, ACTIVE_STORE_ID);
     });
   }
 
@@ -392,7 +429,7 @@ function pushSave(action) {
 
   return fetch(SCRIPT_URL, {
     method:  'POST',
-    body:    JSON.stringify({ data: JSON.stringify(S), action: action || {} }),
+    body:    JSON.stringify({ data: JSON.stringify(S), action: action || {}, storeId: ACTIVE_STORE_ID }),
     headers: { 'Content-Type': 'application/json' },
     signal: controller.signal
   })
@@ -427,6 +464,79 @@ function setStatus(s, detail) {
 function shortErr(detail) {
   detail = String(detail || '').replace(/^Exception:\s*/, '');
   return detail.length > 120 ? detail.slice(0, 117) + '...' : detail;
+}
+
+function activeStore() {
+  return STORES.filter(function(store) { return store.id === ACTIVE_STORE_ID; })[0] || STORES[0] || { id:'', name:'Minding Art' };
+}
+
+function renderStoreName() {
+  var el = document.getElementById('store-name');
+  if (el) el.textContent = activeStore().name || 'Minding Art';
+  renderStoreMenu();
+}
+
+function toggleStoreMenu() {
+  STORE_MENU = !STORE_MENU;
+  renderStoreMenu();
+}
+
+function renderStoreMenu() {
+  var menu = document.getElementById('store-menu');
+  if (!menu) return;
+  menu.style.display = STORE_MENU ? 'block' : 'none';
+  if (!STORE_MENU) return;
+  var items = STORES.map(function(store) {
+    return '<button class="store-item' + (store.id === ACTIVE_STORE_ID ? ' on' : '') + '" onclick="selectStore(\'' + jsq(store.id) + '\')">' +
+      '<span>' + esc(store.name) + '</span>' +
+      (store.id === ACTIVE_STORE_ID ? '<span class="store-check">✓</span>' : '') +
+    '</button>';
+  }).join('');
+  menu.innerHTML = items +
+    '<div class="store-add"><button class="store-item" onclick="addStore()"><span>+ Add store</span></button></div>';
+}
+
+function selectStore(id) {
+  if (!id || id === ACTIVE_STORE_ID) { STORE_MENU = false; renderStoreMenu(); return; }
+  ACTIVE_STORE_ID = id;
+  localStorage.setItem('cro_store_id', id);
+  STORE_MENU = false;
+  S = null;
+  document.getElementById('app').innerHTML = '<div class="center-msg"><div class="spinner"></div>Loading tracker…</div>';
+  loadData();
+}
+
+function addStore() {
+  var name = prompt('Store name');
+  if (!name || !name.trim()) return;
+  STORE_MENU = false;
+  setStatus('save');
+  createStore(name.trim())
+    .then(function(data) {
+      if (data && data.ok === false) throw new Error(data.error || 'Could not create store');
+      receivePayload(data);
+      setStatus('ok');
+      render();
+    })
+    .catch(function(error) {
+      setStatus('err', error && error.message ? error.message : String(error || 'Could not create store'));
+    });
+}
+
+function createStore(name) {
+  if (HAS_APPS_SCRIPT) {
+    return new Promise(function(resolve, reject) {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .createStore(name);
+    });
+  }
+  return fetch(SCRIPT_URL, {
+    method:'POST',
+    body:JSON.stringify({ action:'createStore', name:name }),
+    headers:{ 'Content-Type':'application/json' }
+  }).then(function(r) { return r.json(); });
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

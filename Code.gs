@@ -6,6 +6,9 @@
 var DATA_SHEET = 'CRO_Data';
 var LOG_SHEET  = 'Activity_Log';
 var BACKUP_SHEET = 'CRO_Backups';
+var STORE_INDEX_SHEET = 'CRO_Stores';
+var DEFAULT_STORE_ID = 'minding-art';
+var DEFAULT_STORE_NAME = 'Minding Art';
 var IMAGE_FOLDER = 'CRO Tracker Images';
 var SPREADSHEET_ID = '';
 
@@ -15,9 +18,10 @@ var SPREADSHEET_ID = '';
 
 function doGet(e) {
   var action = e && e.parameter ? e.parameter.action : '';
+  var storeId = e && e.parameter ? e.parameter.storeId : '';
 
   if (action === 'getData') {
-    var data = _read();
+    var data = _read(storeId);
     return _json(data);
   }
 
@@ -31,7 +35,8 @@ function doPost(e) {
   try {
     var body   = JSON.parse(e.postData.contents);
     if (body.action === 'uploadImage') return _json(_uploadImage(body.image || {}));
-    var result = _write(body.data, body.action || {});
+    if (body.action === 'createStore') return _json(_createStore(body.name || 'New Store'));
+    var result = _write(body.data, body.action || {}, body.storeId || '');
     return _json(result);
   } catch(err) {
     return _json({ ok: false, error: err.toString() });
@@ -39,12 +44,16 @@ function doPost(e) {
 }
 
 // Called by tracker.html when deployed as a single Apps Script web app.
-function getData() {
-  return _read();
+function getData(storeId) {
+  return _read(storeId || '');
 }
 
-function saveData(jsonStr, actionInfo) {
-  return _write(jsonStr, actionInfo || {});
+function saveData(jsonStr, actionInfo, storeId) {
+  return _write(jsonStr, actionInfo || {}, storeId || '');
+}
+
+function createStore(name) {
+  return _createStore(name || 'New Store');
 }
 
 function uploadImage(image) {
@@ -69,21 +78,23 @@ function _json(obj) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-function _read() {
+function _read(storeId) {
   try {
     var ss    = _spreadsheet();
-    var sheet = ss.getSheetByName(DATA_SHEET);
-    if (!sheet) { sheet = ss.insertSheet(DATA_SHEET); _initLog(ss); return _seed(); }
+    var store = _storeFor(ss, storeId);
+    var sheet = ss.getSheetByName(store.sheetName);
+    if (!sheet) { sheet = ss.insertSheet(store.sheetName); _initLog(ss); return _storePayload(ss, store, _seed()); }
     var val = sheet.getRange('A1').getValue();
-    return val ? _parseTrackerJson(val) : _seed();
+    return _storePayload(ss, store, val ? _parseTrackerJson(val) : _seed());
   } catch(e) { return { ok: false, error: e.toString() }; }
 }
 
-function _write(jsonStr, actionInfo) {
+function _write(jsonStr, actionInfo, storeId) {
   try {
     var ss    = _spreadsheet();
+    var store = _storeFor(ss, storeId);
     _validateTrackerData(jsonStr);
-    var sheet = ss.getSheetByName(DATA_SHEET) || ss.insertSheet(DATA_SHEET);
+    var sheet = ss.getSheetByName(store.sheetName) || ss.insertSheet(store.sheetName);
     _backupCurrentData(ss, sheet);
     sheet.getRange('A1').setValue(jsonStr);
 
@@ -93,7 +104,7 @@ function _write(jsonStr, actionInfo) {
     logSheet.appendRow([
       new Date(), user,
       actionInfo.action   || '',
-      actionInfo.funnel   || '',
+      actionInfo.store    || store.name || '',
       actionInfo.position || '',
       actionInfo.element  || '',
       actionInfo.value    || '',
@@ -101,6 +112,77 @@ function _write(jsonStr, actionInfo) {
     ]);
     return { ok: true };
   } catch(e) { return { ok: false, error: e.toString() }; }
+}
+
+function _storePayload(ss, activeStore, tracker) {
+  return {
+    stores: _stores(ss),
+    activeStoreId: activeStore.id,
+    tracker: tracker
+  };
+}
+
+function _stores(ss) {
+  var sheet = ss.getSheetByName(STORE_INDEX_SHEET) || _initStores(ss);
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) return _initStores(ss).getDataRange().getValues().slice(1).map(_storeRow);
+  return values.slice(1).filter(function(row) { return row[0] && row[1] && row[2]; }).map(_storeRow);
+}
+
+function _storeRow(row) {
+  return { id:String(row[0]), name:String(row[1]), sheetName:String(row[2]) };
+}
+
+function _storeFor(ss, storeId) {
+  var stores = _stores(ss);
+  var found = stores.filter(function(store) { return store.id === storeId; })[0];
+  return found || stores[0];
+}
+
+function _initStores(ss) {
+  var sheet = ss.getSheetByName(STORE_INDEX_SHEET) || ss.insertSheet(STORE_INDEX_SHEET);
+  sheet.clear();
+  sheet.getRange(1,1,1,4).setValues([['Store ID','Store Name','Data Sheet','Created At']]);
+  sheet.getRange(2,1,1,4).setValues([[DEFAULT_STORE_ID, DEFAULT_STORE_NAME, DATA_SHEET, new Date()]]);
+  sheet.setFrozenRows(1);
+  sheet.getRange(1,1,1,4).setFontWeight('bold');
+  if (!ss.getSheetByName(DATA_SHEET)) ss.insertSheet(DATA_SHEET);
+  return sheet;
+}
+
+function _createStore(name) {
+  try {
+    var ss = _spreadsheet();
+    var cleanName = String(name || '').trim();
+    if (!cleanName) throw new Error('Store name is required.');
+    var stores = _stores(ss);
+    var id = _uniqueStoreId(stores, _slug(cleanName));
+    var sheetName = _uniqueSheetName(ss, 'Store - ' + cleanName);
+    var sheet = ss.insertSheet(sheetName);
+    sheet.getRange('A1').setValue(JSON.stringify(_seed()));
+    var index = ss.getSheetByName(STORE_INDEX_SHEET) || _initStores(ss);
+    index.appendRow([id, cleanName, sheetName, new Date()]);
+    return _read(id);
+  } catch(e) { return { ok:false, error:e.toString() }; }
+}
+
+function _slug(name) {
+  return String(name || 'store').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'store';
+}
+
+function _uniqueStoreId(stores, base) {
+  var id = base;
+  var n = 2;
+  while (stores.some(function(store) { return store.id === id; })) id = base + '-' + n++;
+  return id;
+}
+
+function _uniqueSheetName(ss, base) {
+  var clean = String(base || 'Store').replace(/[\\\/\?\*\[\]:]/g,' ').slice(0, 90).trim() || 'Store';
+  var name = clean;
+  var n = 2;
+  while (ss.getSheetByName(name)) name = (clean.slice(0, 85) + ' ' + n++);
+  return name;
 }
 
 function _validateTrackerData(jsonStr) {
@@ -181,7 +263,7 @@ function _imageFolder() {
 
 function _initLog(ss) {
   var s = ss.getSheetByName(LOG_SHEET) || ss.insertSheet(LOG_SHEET);
-  s.getRange(1,1,1,8).setValues([['Timestamp','User','Action','Funnel','Position','Element','Value','Result']]);
+  s.getRange(1,1,1,8).setValues([['Timestamp','User','Action','Store','Position','Element','Value','Result']]);
   s.setFrozenRows(1);
   s.getRange(1,1,1,8).setFontWeight('bold');
   return s;
