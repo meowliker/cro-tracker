@@ -5,6 +5,7 @@
 
 var DATA_SHEET = 'CRO_Data';
 var LOG_SHEET  = 'Activity_Log';
+var BACKUP_SHEET = 'CRO_Backups';
 var IMAGE_FOLDER = 'CRO Tracker Images';
 var SPREADSHEET_ID = '';
 
@@ -71,7 +72,9 @@ function _read() {
 function _write(jsonStr, actionInfo) {
   try {
     var ss    = _spreadsheet();
+    _validateTrackerData(jsonStr);
     var sheet = ss.getSheetByName(DATA_SHEET) || ss.insertSheet(DATA_SHEET);
+    _backupCurrentData(ss, sheet);
     sheet.getRange('A1').setValue(jsonStr);
 
     var logSheet = ss.getSheetByName(LOG_SHEET) || _initLog(ss);
@@ -88,6 +91,26 @@ function _write(jsonStr, actionInfo) {
     ]);
     return { ok: true };
   } catch(e) { return { ok: false, error: e.toString() }; }
+}
+
+function _validateTrackerData(jsonStr) {
+  var data = JSON.parse(jsonStr);
+  if (!data || !Array.isArray(data.slots) || !data.slots.length) {
+    throw new Error('Rejected save: tracker data must contain at least one slot.');
+  }
+  if (!data.active || !data.slots.some(function(slot) { return slot.id === data.active; })) {
+    throw new Error('Rejected save: active slot is missing from tracker data.');
+  }
+}
+
+function _backupCurrentData(ss, dataSheet) {
+  var current = dataSheet.getRange('A1').getValue();
+  if (!current) return;
+  var backupSheet = ss.getSheetByName(BACKUP_SHEET) || _initBackup(ss);
+  var lastRow = backupSheet.getLastRow();
+  var lastBackup = lastRow > 1 ? backupSheet.getRange(lastRow, 2).getValue() : '';
+  if (lastBackup === current) return;
+  backupSheet.appendRow([new Date(), current]);
 }
 
 function _spreadsheet() {
@@ -128,6 +151,14 @@ function _initLog(ss) {
   s.getRange(1,1,1,8).setValues([['Timestamp','User','Action','Funnel','Position','Element','Value','Result']]);
   s.setFrozenRows(1);
   s.getRange(1,1,1,8).setFontWeight('bold');
+  return s;
+}
+
+function _initBackup(ss) {
+  var s = ss.getSheetByName(BACKUP_SHEET) || ss.insertSheet(BACKUP_SHEET);
+  s.getRange(1,1,1,2).setValues([['Timestamp','CRO_Data_A1']]);
+  s.setFrozenRows(1);
+  s.getRange(1,1,1,2).setFontWeight('bold');
   return s;
 }
 
