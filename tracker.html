@@ -278,6 +278,7 @@ var AEF        = {};
 var NFV        = {};
 var EVF        = {};
 var NSF        = { funnel:'KLS', platform:'OCU', position:'Pre-Purchase' };
+var AFTERSELL_POSITIONS = ['Upsell 1','Upsell 2','Upsell 3','Downsell 1','Downsell 2'];
 var saveInFlight = false;
 var pendingSaveAction = null;
 
@@ -542,7 +543,86 @@ function createStore(name) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function uid()   { return 'v' + Date.now() + Math.random().toString(36).slice(2,5); }
 function fk(s,e) { return s + '|||' + e; }
-function gs(id)  { return S.slots.filter(function(s) { return s.id === id; })[0]; }
+function isProductMode() { return S && Array.isArray(S.products); }
+function slug(s) { return String(s || 'item').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'') || 'item'; }
+function productSlotId(product, platform, position) { return product.id + '::' + platform + '::' + position; }
+function defaultElements(platform) {
+  return platform === 'OCU'
+    ? { 'Price':{winner:null,variants:[]}, 'Image / GIF':{winner:null,variants:[]}, 'Headline / Copy':{winner:null,variants:[]}, 'Product':{winner:null,variants:[]} }
+    : { 'Price':{winner:null,variants:[]}, 'Layout':{winner:null,variants:[]}, 'Headline / Copy':{winner:null,variants:[]}, 'Product':{winner:null,variants:[]} };
+}
+function emptyPosition(platform) { return { elements: defaultElements(platform) }; }
+function productById(id) {
+  if (!isProductMode()) return null;
+  return S.products.filter(function(product) { return product.id === id; })[0] || null;
+}
+function activeProduct() {
+  if (!isProductMode() || !S.products.length) return null;
+  var product = productById(S.activeProductId);
+  if (!product) {
+    product = S.products[0];
+    S.activeProductId = product.id;
+  }
+  return product;
+}
+function ensureProductStructure(product) {
+  product.platforms = product.platforms || {};
+  product.platforms.OCU = product.platforms.OCU || {};
+  product.platforms.OCU.positions = product.platforms.OCU.positions || {};
+  product.platforms.OCU.positions['Pre-Purchase'] = product.platforms.OCU.positions['Pre-Purchase'] || emptyPosition('OCU');
+  product.platforms.OCU.activePosition = product.platforms.OCU.activePosition || 'Pre-Purchase';
+
+  product.platforms.AfterSell = product.platforms.AfterSell || {};
+  product.platforms.AfterSell.positions = product.platforms.AfterSell.positions || {};
+  AFTERSELL_POSITIONS.forEach(function(pos) {
+    product.platforms.AfterSell.positions[pos] = product.platforms.AfterSell.positions[pos] || emptyPosition('AfterSell');
+  });
+  product.platforms.AfterSell.activePosition = product.platforms.AfterSell.activePosition || 'Upsell 1';
+}
+function activePlatform() {
+  return S.activePlatform === 'AfterSell' ? 'AfterSell' : 'OCU';
+}
+function activePosition(product, platform) {
+  if (platform === 'AfterSell') {
+    ensureProductStructure(product);
+    return product.platforms.AfterSell.activePosition || S.activePosition || 'Upsell 1';
+  }
+  return 'Pre-Purchase';
+}
+function activeProductSlot() {
+  var product = activeProduct();
+  if (!product) return null;
+  ensureProductStructure(product);
+  var platform = activePlatform();
+  var position = activePosition(product, platform);
+  var node = product.platforms[platform].positions[position];
+  return {
+    id: productSlotId(product, platform, position),
+    funnel: product.name,
+    platform: platform,
+    position: position,
+    elements: node.elements
+  };
+}
+function gs(id)  {
+  if (isProductMode()) return activeProductSlot();
+  return S.slots.filter(function(s) { return s.id === id; })[0];
+}
+function forEachElementSet(fn) {
+  if (!S) return;
+  if (isProductMode()) {
+    S.products.forEach(function(product) {
+      ensureProductStructure(product);
+      Object.keys(product.platforms).forEach(function(platform) {
+        Object.keys(product.platforms[platform].positions || {}).forEach(function(position) {
+          fn(product.platforms[platform].positions[position].elements || {});
+        });
+      });
+    });
+    return;
+  }
+  (S.slots || []).forEach(function(slot) { fn(slot.elements || {}); });
+}
 function esc(s)  {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -563,11 +643,11 @@ function imageOnlyVariant(v) {
 }
 
 function normalizeAttachmentRows() {
-  if (!S || !S.slots) return false;
+  if (!S) return false;
   var changed = false;
-  S.slots.forEach(function(slot) {
-    Object.keys(slot.elements || {}).forEach(function(en) {
-      var el = slot.elements[en];
+  forEachElementSet(function(elements) {
+    Object.keys(elements || {}).forEach(function(en) {
+      var el = elements[en];
       if (!el || !el.variants || el.variants.length < 2) return;
       var merged = [];
       el.variants.forEach(function(v) {
@@ -708,8 +788,92 @@ function sfHTML() {
     '</div></div>';
 }
 
+function addProductHTML() {
+  return '<div class="sf-wrap"><div class="sf-title">Add product</div>' +
+    '<div class="fg" style="margin-bottom:10px"><label class="flbl">Product name</label>' +
+      '<input type="text" value="'+esc(NSF.product||'')+'" placeholder="e.g. Big Mystery Box"' +
+      ' oninput="NSF.product=this.value" style="width:100%"></div>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button class="btn btn-primary btn-sm" onclick="addProduct()">Add</button>' +
+      '<button class="btn btn-sm" onclick="SF=false;NSF.product=\'\';render()">Cancel</button>' +
+    '</div></div>';
+}
+
+function renderProductMode() {
+  var products = S.products || [];
+  var product = products.length ? activeProduct() : null;
+  var tabs = products.map(function(product) {
+    return '<button class="stab'+(S.activeProductId===product.id?' on':'')+'" onclick="setProduct(\''+jsq(product.id)+'\')">'+
+      esc(product.name)+'</button>';
+  }).join('');
+
+  if (!products.length) {
+    document.getElementById('app').innerHTML =
+      '<div class="slot-nav">' +
+        '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add product</button>' +
+      '</div>' +
+      (SF ? addProductHTML() : '<div class="center-msg">Add your first product to start tracking OCU and AfterSell tests.</div>');
+    return;
+  }
+
+  ensureProductStructure(product);
+  var platform = activePlatform();
+  var position = activePosition(product, platform);
+  var slot = activeProductSlot();
+
+  var platformTabs = ['OCU','AfterSell'].map(function(name) {
+    return '<button class="stab'+(platform===name?' on':'')+'" onclick="setPlatform(\''+name+'\')">'+esc(name)+'</button>';
+  }).join('');
+  var positionTabs = platform === 'AfterSell'
+    ? '<div class="slot-nav">' + AFTERSELL_POSITIONS.map(function(pos) {
+        return '<button class="stab'+(position===pos?' on':'')+'" onclick="setAfterSellPosition(\''+pos+'\')">'+esc(pos)+'</button>';
+      }).join('') + '</div>'
+    : '';
+
+  var cards = Object.keys(slot.elements).map(function(en) {
+    return cardHTML(slot.id, en, slot.elements[en]);
+  }).join('');
+  var addCardOpen = AEF.hasOwnProperty(slot.id);
+  var addCard = '<div class="add-card"><div style="flex:1;display:flex">' +
+    (addCardOpen
+      ? '<div class="ae-form" style="width:100%">' +
+          '<div class="fg" style="margin-bottom:7px"><label class="flbl">Element name</label>' +
+          '<input type="text" value="'+esc(AEF[slot.id]||'')+'" placeholder="e.g. Timer · CTA Button · Badge text"' +
+          ' oninput="AEF[\''+slot.id+'\']=this.value" style="width:100%"></div>' +
+          '<div style="display:flex;gap:5px">' +
+            '<button class="btn btn-primary btn-sm" onclick="addElem(\''+slot.id+'\')">Add</button>' +
+            '<button class="btn btn-sm" onclick="delete AEF[\''+slot.id+'\'];render()">Cancel</button>' +
+          '</div></div>'
+      : '<button class="ae-btn" onclick="AEF[\''+slot.id+'\']=\'\';render()">' +
+          '<i class="ti ti-plus" style="font-size:14px"></i> Add element to track</button>'
+    ) + '</div></div>';
+
+  document.getElementById('app').innerHTML =
+    '<div class="slot-nav">' + tabs +
+      '<button class="stab stab-add" onclick="SF=!SF;render()"><i class="ti ti-plus"></i> Add product</button>' +
+    '</div>' +
+    (SF ? addProductHTML() : '') +
+    '<div class="slot-nav">' + platformTabs + '</div>' +
+    positionTabs +
+    '<div class="slot-hdr"><div>' +
+      '<div class="slot-title">' + esc(product.name) + ' — ' + esc(platform) + ' · ' + esc(position) + '</div>' +
+      '<div class="slot-sub">Current winners · what failed · what to test next</div>' +
+    '</div></div>' +
+    '<div class="legend">' +
+      '<span class="leg"><span class="lic ic-w">✓</span> Winner</span>' +
+      '<span class="leg"><span class="lic ic-f">✗</span> Failed — don\'t retest</span>' +
+      '<span class="leg"><span class="lic ic-r">↺</span> Running now</span>' +
+      '<span class="leg"><span class="lic ic-p">○</span> Planned / queue</span>' +
+      '<span class="leg"><span class="lic ic-i">~</span> Inconclusive</span>' +
+    '</div>' +
+    '<div class="egrid">' + cards + addCard + '</div>' +
+    '<div class="log-link">Activity log → your Google Sheet → <strong>Activity_Log</strong> tab &nbsp;·&nbsp; ' +
+      '<span style="cursor:pointer;text-decoration:underline" onclick="localStorage.removeItem(\'cro_script_url\');location.reload()">Change backend URL</span></div>';
+}
+
 function render() {
   if (!S) return;
+  if (isProductMode()) { renderProductMode(); return; }
   var slot = gs(S.active);
 
   var tabs = S.slots.map(function(s) {
@@ -764,6 +928,24 @@ function render() {
 
 // ── Actions ──────────────────────────────────────────────────────────────────
 function setSlot(id)    { S.active = id; render(); }
+function setProduct(id) {
+  S.activeProductId = id;
+  render();
+}
+function setPlatform(platform) {
+  S.activePlatform = platform === 'AfterSell' ? 'AfterSell' : 'OCU';
+  var product = activeProduct();
+  if (product) S.activePosition = activePosition(product, S.activePlatform);
+  render();
+}
+function setAfterSellPosition(position) {
+  var product = activeProduct(); if (!product) return;
+  ensureProductStructure(product);
+  product.platforms.AfterSell.activePosition = position;
+  S.activePlatform = 'AfterSell';
+  S.activePosition = position;
+  render();
+}
 function openF(sid, en) { OF[fk(sid,en)] = true; render(); }
 function closeF(sid,en) { delete OF[fk(sid,en)]; delete NFV[fk(sid,en)]; delete EVF[fk(sid,en)]; render(); }
 function setF(k,f,v)    {
@@ -943,6 +1125,34 @@ function addSlot() {
   S.slots.push({ id:id, funnel:NSF.funnel, platform:NSF.platform, position:NSF.position, elements:els });
   S.active = id; SF = false;
   scheduleSave({ action:'Added slot', funnel:NSF.funnel, position:NSF.platform+' '+NSF.position });
+  render();
+}
+
+function addProduct() {
+  var name = (NSF.product || '').trim();
+  if (!name) return;
+  var base = slug(name);
+  var id = base;
+  var n = 2;
+  while (S.products.some(function(product) { return product.id === id; })) id = base + '-' + n++;
+  var product = {
+    id: id,
+    name: name,
+    platforms: {
+      OCU: { activePosition:'Pre-Purchase', positions:{ 'Pre-Purchase': emptyPosition('OCU') } },
+      AfterSell: { activePosition:'Upsell 1', positions:{} }
+    }
+  };
+  AFTERSELL_POSITIONS.forEach(function(pos) {
+    product.platforms.AfterSell.positions[pos] = emptyPosition('AfterSell');
+  });
+  S.products.push(product);
+  S.activeProductId = id;
+  S.activePlatform = 'OCU';
+  S.activePosition = 'Pre-Purchase';
+  SF = false;
+  NSF.product = '';
+  scheduleSave({ action:'Added product', store:activeStore().name, value:name });
   render();
 }
 

@@ -83,9 +83,9 @@ function _read(storeId) {
     var ss    = _spreadsheet();
     var store = _storeFor(ss, storeId);
     var sheet = ss.getSheetByName(store.sheetName);
-    if (!sheet) { sheet = ss.insertSheet(store.sheetName); _initLog(ss); return _storePayload(ss, store, _seed()); }
+    if (!sheet) { sheet = ss.insertSheet(store.sheetName); _initLog(ss); return _storePayload(ss, store, _defaultTrackerForStore(store)); }
     var val = sheet.getRange('A1').getValue();
-    return _storePayload(ss, store, val ? _parseTrackerJson(val) : _seed());
+    return _storePayload(ss, store, val ? _parseTrackerJson(val) : _defaultTrackerForStore(store));
   } catch(e) { return { ok: false, error: e.toString() }; }
 }
 
@@ -159,7 +159,7 @@ function _createStore(name) {
     var id = _uniqueStoreId(stores, _slug(cleanName));
     var sheetName = _uniqueSheetName(ss, 'Store - ' + cleanName);
     var sheet = ss.insertSheet(sheetName);
-    sheet.getRange('A1').setValue(JSON.stringify(_seed()));
+    sheet.getRange('A1').setValue(JSON.stringify(_emptyProductTracker()));
     var index = ss.getSheetByName(STORE_INDEX_SHEET) || _initStores(ss);
     index.appendRow([id, cleanName, sheetName, new Date()]);
     return _read(id);
@@ -187,12 +187,32 @@ function _uniqueSheetName(ss, base) {
 
 function _validateTrackerData(jsonStr) {
   var data = _parseTrackerJson(jsonStr);
+  if (data && Array.isArray(data.products)) {
+    if (data.activeProductId && !data.products.some(function(product) { return product.id === data.activeProductId; })) {
+      throw new Error('Rejected save: active product is missing from tracker data.');
+    }
+    return;
+  }
   if (!data || !Array.isArray(data.slots) || !data.slots.length) {
     throw new Error('Rejected save: tracker data must contain at least one slot.');
   }
   if (!data.active || !data.slots.some(function(slot) { return slot.id === data.active; })) {
     throw new Error('Rejected save: active slot is missing from tracker data.');
   }
+}
+
+function _defaultTrackerForStore(store) {
+  return store && store.id === DEFAULT_STORE_ID ? _seed() : _emptyProductTracker();
+}
+
+function _emptyProductTracker() {
+  return {
+    schemaVersion: 2,
+    activeProductId: '',
+    activePlatform: 'OCU',
+    activePosition: 'Pre-Purchase',
+    products: []
+  };
 }
 
 function _parseTrackerJson(jsonStr) {
