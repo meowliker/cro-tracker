@@ -63,10 +63,10 @@ a{color:#1a1a18;font-weight:600}
 
 /* ─── Main layout ─────────────────────────────────────────────── */
 .wrap{max-width:920px;margin:0 auto;padding:20px 16px}
-.wrap.with-sidebar{max-width:1360px}
-.tracker-layout{display:grid;grid-template-columns:minmax(0,920px) 360px;gap:18px;align-items:start}
+.wrap.with-sidebar{max-width:920px}
+.tracker-layout{display:block}
 .tracker-main{min-width:0}
-@media(max-width:980px){.tracker-layout{grid-template-columns:1fr}.wrap.with-sidebar{max-width:920px}}
+@media(max-width:1260px){.decision-sidebar{position:static!important;width:auto!important;margin-top:18px}}
 
 /* ─── Slot nav ────────────────────────────────────────────────── */
 .slot-nav{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
@@ -156,6 +156,8 @@ a{color:#1a1a18;font-weight:600}
 .drop-rm{position:absolute;right:-5px;top:-5px;width:16px;height:16px;border-radius:50%;border:1px solid #e8e8e5;background:#fff;color:#999;cursor:pointer;font-size:10px;line-height:1}
 .drop-rm:hover{background:#fce8e8;color:#c42b2b}
 .img-preview{position:fixed;inset:0;background:rgba(20,20,18,.72);z-index:300;display:none;align-items:center;justify-content:center;padding:28px}
+#img-preview{z-index:320}
+#detail-preview{z-index:300}
 .img-preview.on{display:flex}
 .img-preview-box{position:relative;max-width:min(960px,92vw);max-height:88vh}
 .img-preview-box img{display:block;max-width:100%;max-height:88vh;border-radius:8px;background:#fff;box-shadow:0 18px 60px rgba(0,0,0,.35)}
@@ -183,24 +185,41 @@ a{color:#1a1a18;font-weight:600}
 .log-link{font-size:11px;color:#bbb;text-align:right;margin-top:14px;padding-top:14px;border-top:1px solid #ebebea}
 
 /* ─── Decision sidebar ───────────────────────────────────────── */
-.decision-sidebar{background:#fff;border:1px solid #e8e8e5;border-radius:12px;overflow:hidden;position:sticky;top:74px}
+.decision-sidebar{background:#fff;border:1px solid #e8e8e5;border-radius:12px;overflow:hidden;position:fixed;top:74px;right:16px;width:min(360px,calc((100vw - 920px)/2 - 28px));min-width:220px;z-index:80}
 .ds-head{padding:12px;border-bottom:1px solid #f2f2f0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px;background:#fafaf8}
 .ds-title{font-size:12px;font-weight:700}
 .ds-sub{font-size:10px;color:#aaa;margin-top:2px}
 .ds-count{font-size:10px;color:#777;background:#f0f0ee;border-radius:14px;padding:2px 7px;white-space:nowrap}
-.ds-filters{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:10px 12px;border-bottom:1px solid #f2f2f0}
+.ds-filters{display:grid;grid-template-columns:1fr;gap:7px;padding:10px 12px;border-bottom:1px solid #f2f2f0}
 .ds-filters .fg{gap:2px}
 .ds-list{max-height:calc(100vh - 245px);overflow:auto}
 .ds-empty{padding:24px 14px;text-align:center;color:#bbb;font-size:12px}
 .decision-item{padding:10px 12px;border-bottom:1px solid #f5f5f3}
 .decision-item:last-child{border-bottom:none}
-.decision-top{display:flex;align-items:center;gap:6px;margin-bottom:5px}
-.decision-product{font-size:12px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.decision-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.decision-name{font-size:12px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.decision-info{border:none;background:#f0f0ee;color:#777;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.decision-info:hover{background:#e5e5e1;color:#1a1a18}
+.decision-product{font-size:11px;font-weight:600;color:#333;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .decision-meta{font-size:10px;color:#999;display:flex;gap:5px;flex-wrap:wrap;margin-bottom:5px}
-.decision-el{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:3px}
-.decision-value{font-size:12px;color:#333;line-height:1.35;word-break:break-word}
+.decision-el{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:4px}
+.decision-badge{display:inline-flex;border-radius:12px;padding:2px 7px;font-size:10px;font-weight:700;margin-bottom:4px}
+.decision-badge.win{background:#e3f5d0;color:#2d7d0a}
+.decision-badge.fail{background:#fce8e8;color:#c42b2b}
+.decision-badge.inconclusive{background:#fff3c4;color:#8a6200}
 .decision-dates{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px;font-size:10px;color:#999}
 .decision-dates strong{color:#666;font-weight:600}
+.detail-body{background:#fff;border-radius:10px;max-width:min(620px,92vw);max-height:88vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.detail-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding:16px;border-bottom:1px solid #eee}
+.detail-title{font-size:16px;font-weight:700;margin-bottom:4px}
+.detail-sub{font-size:12px;color:#777;line-height:1.5}
+.detail-content{padding:16px;font-size:13px;line-height:1.5}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.detail-field{border:1px solid #eee;border-radius:8px;padding:8px;background:#fafaf8}
+.detail-label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#aaa;font-weight:700;margin-bottom:3px}
+.detail-images{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.detail-images img{width:84px;height:84px;border-radius:8px;object-fit:cover;border:1px solid #e8e8e5;cursor:pointer;background:#f8f8f6}
+@media(max-width:1260px){.decision-sidebar{position:static;width:auto;min-width:0;margin-top:18px}}
 </style>
 </head>
 <body>
@@ -294,6 +313,10 @@ a{color:#1a1a18;font-weight:600}
     <button class="img-preview-close" onclick="hideImgPreview()">✕</button>
     <img id="img-preview-img" alt="Preview">
   </div>
+</div>
+
+<div class="img-preview" id="detail-preview" onclick="hideDecisionInfo()">
+  <div class="detail-body" id="detail-body" onclick="event.stopPropagation()"></div>
 </div>
 
 <script>
@@ -776,7 +799,7 @@ function dateLabel(date) {
 }
 
 function resultLabel(result) {
-  return { win:'Winner', fail:'Failed', running:'Running', planned:'Planned', inconclusive:'Inconclusive' }[result] || result || 'Planned';
+  return { win:'Winner', fail:'Loser', running:'Running', planned:'Planned', inconclusive:'Inconclusive' }[result] || result || 'Planned';
 }
 
 function collectDecisions() {
@@ -794,6 +817,7 @@ function collectDecisions() {
           variants.forEach(function(v) {
             if (['win','fail','inconclusive'].indexOf(v.result) === -1) return;
             rows.push({
+              id: product.id + '|' + platform + '|' + position + '|' + elementName + '|' + v.id,
               productId: product.id,
               product: product.name,
               platform: platform,
@@ -803,7 +827,10 @@ function collectDecisions() {
               result: v.result || 'planned',
               startDate: startDate || v.date || '',
               decisionDate: v.date || '',
-              notes: v.notes || ''
+              notes: v.notes || '',
+              rpv: v.rpv,
+              cvr: v.cvr,
+              images: v.images || []
             });
           });
         });
@@ -847,19 +874,21 @@ function decisionSidebarHTML() {
   ];
   var items = filtered.map(function(row) {
     return '<div class="decision-item">' +
-      '<div class="decision-top">' + ic(row.result) + '<div class="decision-product">' + esc(row.product) + '</div></div>' +
-      '<div class="decision-meta"><span>' + esc(row.platform) + '</span><span>·</span><span>' + esc(row.position) + '</span><span>·</span><span>' + esc(resultLabel(row.result)) + '</span></div>' +
+      '<div class="decision-top"><div class="decision-name">' + esc(row.value || 'Untitled result') + '</div>' +
+        '<button class="decision-info" title="More info" onclick="showDecisionInfo(\'' + jsq(row.id) + '\')"><i class="ti ti-info-small"></i></button></div>' +
+      '<div class="decision-product">' + esc(row.product) + '</div>' +
       '<div class="decision-el">' + esc(row.element) + '</div>' +
-      '<div class="decision-value">' + esc(row.value || row.notes || 'Untitled result') + '</div>' +
+      '<div class="decision-meta"><span>' + esc(row.platform) + '</span><span>·</span><span>' + esc(row.position) + '</span></div>' +
+      '<span class="decision-badge ' + esc(row.result) + '">' + esc(resultLabel(row.result)) + '</span>' +
       '<div class="decision-dates"><span><strong>Start</strong> ' + esc(dateLabel(row.startDate)) + '</span><span><strong>Decision</strong> ' + esc(dateLabel(row.decisionDate)) + '</span></div>' +
     '</div>';
   }).join('');
   return '<aside class="decision-sidebar">' +
-    '<div class="ds-head"><div><div class="ds-title">Decided results</div><div class="ds-sub">' + esc(activeStore().name || 'Current store') + '</div></div><span class="ds-count">' + filtered.length + '/' + rows.length + '</span></div>' +
+    '<div class="ds-head"><div><div class="ds-title">Results</div></div><span class="ds-count">' + filtered.length + '/' + rows.length + '</span></div>' +
     '<div class="ds-filters">' +
       '<div class="fg"><label class="flbl">Product</label>' + selectHTML(DECISION_FILTERS.product, productOptions, "setDecisionFilter('product',this.value)") + '</div>' +
       '<div class="fg"><label class="flbl">Platform</label>' + selectHTML(DECISION_FILTERS.platform, platformOptions, "setDecisionFilter('platform',this.value)") + '</div>' +
-      '<div class="fg"><label class="flbl">Step</label>' + selectHTML(DECISION_FILTERS.position, positionOptions, "setDecisionFilter('position',this.value)") + '</div>' +
+      (DECISION_FILTERS.platform === 'AfterSell' ? '<div class="fg"><label class="flbl">Step</label>' + selectHTML(DECISION_FILTERS.position, positionOptions, "setDecisionFilter('position',this.value)") + '</div>' : '') +
       '<div class="fg"><label class="flbl">Decision</label>' + selectHTML(DECISION_FILTERS.result, resultOptions, "setDecisionFilter('result',this.value)") + '</div>' +
     '</div>' +
     '<div class="ds-list">' + (items || '<div class="ds-empty">No decided results match these filters.</div>') + '</div>' +
@@ -871,7 +900,7 @@ function productLayoutHTML(main) {
   var app = document.getElementById('app');
   if (app) app.className = DECISION_SIDEBAR && isProductMode() ? 'wrap with-sidebar' : 'wrap';
   if (!DECISION_SIDEBAR) return '<div class="tracker-main">' + main + '</div>';
-  return '<div class="tracker-layout"><div class="tracker-main">' + main + '</div>' + decisionSidebarHTML() + '</div>';
+  return '<div class="tracker-layout"><div class="tracker-main">' + main + '</div></div>' + decisionSidebarHTML();
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
@@ -907,7 +936,7 @@ function varHTML(v, sid, en) {
 
 function fval(sid, en) {
   var k = fk(sid, en);
-  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'running', date:today(), notes:'', images:[] };
   return NFV[k];
 }
 
@@ -916,7 +945,7 @@ function afHTML(sid, en) {
   var esc_en = jsq(en);
   var editing = EVF[k];
   var fileId = 'img_' + sid.replace(/[^a-z0-9]/gi,'_') + '_' + en.replace(/[^a-z0-9]/gi,'_');
-  var opts = ['fail','win','running','inconclusive','planned'].map(function(r) {
+  var opts = ['running','win','fail','inconclusive','planned'].map(function(r) {
     return '<option' + (f.result === r ? ' selected' : '') + '>' + r + '</option>';
   }).join('');
   var imgs = (f.images || []).map(function(img, i) {
@@ -1158,13 +1187,13 @@ function setAfterSellPosition(position) {
 function openF(sid, en) { OF[fk(sid,en)] = true; render(); }
 function closeF(sid,en) { delete OF[fk(sid,en)]; delete NFV[fk(sid,en)]; delete EVF[fk(sid,en)]; render(); }
 function setF(k,f,v)    {
-  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'running', date:today(), notes:'', images:[] };
   NFV[k][f] = v;
 }
 
 function addImgs(k, files) {
   if (!files || !files.length) return;
-  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'running', date:today(), notes:'', images:[] };
   Array.prototype.slice.call(files).forEach(function(file) {
     if (!file.type || !file.type.match(/^image\//)) return;
     var reader = new FileReader();
@@ -1222,6 +1251,35 @@ function showImgPreview(src) {
 function hideImgPreview() {
   document.getElementById('img-preview').className = 'img-preview';
   document.getElementById('img-preview-img').src = '';
+}
+
+function showDecisionInfo(id) {
+  var row = collectDecisions().filter(function(item) { return item.id === id; })[0];
+  if (!row) return;
+  var imgs = (row.images || []).map(function(img) {
+    return '<img src="' + esc(imgSrc(img)) + '" alt="' + esc(img.name || 'Attached image') + '" onclick="showImgPreview(\'' + jsq(imgPreviewSrc(img)) + '\')">';
+  }).join('');
+  document.getElementById('detail-body').innerHTML =
+    '<div class="detail-head"><div>' +
+      '<div class="detail-title">' + esc(row.value || 'Untitled result') + '</div>' +
+      '<div class="detail-sub">' + esc(row.product) + '<br>' + esc(row.element) + '<br>' + esc(row.platform) + ' · ' + esc(row.position) + '</div>' +
+    '</div><button class="img-preview-close" onclick="hideDecisionInfo()">✕</button></div>' +
+    '<div class="detail-content">' +
+      '<div class="detail-grid">' +
+        '<div class="detail-field"><div class="detail-label">Decision</div><span class="decision-badge ' + esc(row.result) + '">' + esc(resultLabel(row.result)) + '</span></div>' +
+        '<div class="detail-field"><div class="detail-label">Dates</div>Start ' + esc(dateLabel(row.startDate)) + '<br>Decision ' + esc(dateLabel(row.decisionDate)) + '</div>' +
+        '<div class="detail-field"><div class="detail-label">Rev/Visit</div>' + esc(row.rpv ? '$' + parseFloat(row.rpv).toFixed(2) : '—') + '</div>' +
+        '<div class="detail-field"><div class="detail-label">CVR</div>' + esc(row.cvr ? parseFloat(row.cvr).toFixed(1) + '%' : '—') + '</div>' +
+      '</div>' +
+      '<div class="detail-field"><div class="detail-label">Notes</div>' + esc(row.notes || '—') + '</div>' +
+      (imgs ? '<div class="detail-label" style="margin-top:12px">Images</div><div class="detail-images">' + imgs + '</div>' : '') +
+    '</div>';
+  document.getElementById('detail-preview').className = 'img-preview on';
+}
+
+function hideDecisionInfo() {
+  document.getElementById('detail-preview').className = 'img-preview';
+  document.getElementById('detail-body').innerHTML = '';
 }
 
 function addV(sid, en) {
