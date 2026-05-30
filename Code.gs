@@ -65,7 +65,7 @@ function _read() {
     var sheet = ss.getSheetByName(DATA_SHEET);
     if (!sheet) { sheet = ss.insertSheet(DATA_SHEET); _initLog(ss); return _seed(); }
     var val = sheet.getRange('A1').getValue();
-    return val ? JSON.parse(val) : _seed();
+    return val ? _parseTrackerJson(val) : _seed();
   } catch(e) { return { ok: false, error: e.toString() }; }
 }
 
@@ -94,13 +94,35 @@ function _write(jsonStr, actionInfo) {
 }
 
 function _validateTrackerData(jsonStr) {
-  var data = JSON.parse(jsonStr);
+  var data = _parseTrackerJson(jsonStr);
   if (!data || !Array.isArray(data.slots) || !data.slots.length) {
     throw new Error('Rejected save: tracker data must contain at least one slot.');
   }
   if (!data.active || !data.slots.some(function(slot) { return slot.id === data.active; })) {
     throw new Error('Rejected save: active slot is missing from tracker data.');
   }
+}
+
+function _parseTrackerJson(jsonStr) {
+  var text = String(jsonStr || '').trim();
+  try { return JSON.parse(text); } catch(e) {}
+
+  var depth = 0;
+  var inString = false;
+  var escapeNext = false;
+  for (var i = 0; i < text.length; i++) {
+    var ch = text.charAt(i);
+    if (escapeNext) { escapeNext = false; continue; }
+    if (ch === '\\') { escapeNext = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === '{') depth++;
+    if (ch === '}') {
+      depth--;
+      if (depth === 0) return JSON.parse(text.slice(0, i + 1));
+    }
+  }
+  return JSON.parse(text);
 }
 
 function _backupCurrentData(ss, dataSheet) {
