@@ -90,7 +90,7 @@ a{color:#1a1a18;font-weight:600}
 
 /* ─── Variant list ────────────────────────────────────────────── */
 .vlist{flex:1}
-.vwrap{border-bottom:1px solid #f5f5f3}
+.vwrap{border-bottom:1px solid #f5f5f3;padding-bottom:7px}
 .vwrap:last-child{border-bottom:none}
 .vitem{display:flex;align-items:center;gap:6px;padding:7px 11px;border-bottom:1px solid #f5f5f3;transition:background .1s}
 .vwrap .vitem{border-bottom:none}
@@ -108,8 +108,10 @@ a{color:#1a1a18;font-weight:600}
 .vbtn-w:hover{background:#e3f5d0;color:#2d7d0a}
 .vbtn-d:hover{background:#fce8e8;color:#c42b2b}
 .vbtn-e:hover{background:#ddeeff;color:#1460a8}
-.vthumbs{display:flex;gap:5px;flex-wrap:wrap;padding:0 11px 7px 32px}
-.vthumb{width:34px;height:34px;border-radius:6px;border:1px solid #e8e8e5;object-fit:cover;background:#f8f8f6}
+.vthumbs{display:flex;gap:6px;flex-wrap:wrap;padding:2px 11px 0 32px}
+.vthumb-btn{background:none;border:none;padding:0;cursor:pointer;line-height:0}
+.vthumb{width:44px;height:44px;border-radius:7px;border:1px solid #e8e8e5;object-fit:cover;background:#f8f8f6}
+.vthumb:hover{border-color:#bbb}
 .vempty{padding:14px 12px;font-size:12px;color:#ccc;text-align:center;font-style:italic}
 
 /* ─── Log button ──────────────────────────────────────────────── */
@@ -435,6 +437,12 @@ function jsq(s)  { return esc(s).replace(/'/g,'&#39;'); }
 function today() { return new Date().toISOString().slice(0,10); }
 function imgSrc(img) { return img.url || img.thumbUrl || img.data || ''; }
 function imgPreviewSrc(img) { return img.url || img.thumbUrl || img.data || img.previewUrl || ''; }
+function attachmentLabel(v) {
+  return !v.notes && v.images && v.images.length && (
+    v.value === 'Image attachment' ||
+    v.images.some(function(img) { return img.name === v.value; })
+  );
+}
 
 function ic(r) {
   var m = { win:'<span class="vic ic-w">✓</span>', fail:'<span class="vic ic-f">✗</span>',
@@ -445,19 +453,22 @@ function ic(r) {
 
 // ── Render ───────────────────────────────────────────────────────────────────
 function varHTML(v, sid, en) {
+  var k = fk(sid, en);
+  if (EVF[k] === v.id) return '';
   var rpv  = v.rpv ? '$' + parseFloat(v.rpv).toFixed(2) + '/v' : '';
   var cvr  = v.cvr ? parseFloat(v.cvr).toFixed(1) + '%' : '';
   var dt   = v.date ? v.date.slice(5) : '';
   var xout = v.result === 'fail' ? ' xout' : '';
+  var label = attachmentLabel(v) ? '' : esc(v.value);
   var imgs = (v.images || []).map(function(img) {
-    return '<button class="vbtn" title="Preview image" onclick="showImgPreview(\'' + jsq(imgPreviewSrc(img)) + '\')">' +
+    return '<button class="vthumb-btn" title="Preview image" onclick="showImgPreview(\'' + jsq(imgPreviewSrc(img)) + '\')">' +
       '<img class="vthumb" src="' + esc(imgSrc(img)) + '" alt="' + esc(img.name || 'Attached image') + '"></button>';
   }).join('');
   var wbtn = v.result !== 'win'
     ? '<button class="vbtn vbtn-w" onclick="setWin(\'' + sid + '\',\'' + jsq(en) + '\',\'' + v.id + '\')">Set winner</button>'
     : '';
   return '<div class="vwrap"><div class="vitem">' + ic(v.result) +
-    '<span class="v-val' + xout + '" title="' + esc(v.value) + '">' + esc(v.value) + '</span>' +
+    '<span class="v-val' + xout + '" title="' + esc(v.notes || v.value || '') + '">' + label + '</span>' +
     '<span class="v-meta">' +
       (rpv ? '<span class="v-rpv">' + rpv + '</span>' : '') +
       (cvr ? '<span>' + cvr + '</span>' : '') +
@@ -685,7 +696,7 @@ function addV(sid, en) {
   var k = fk(sid,en); var f = NFV[k]||{};
   var value = f.value && f.value.trim()
     ? f.value.trim()
-    : ((f.notes && f.notes.trim()) || ((f.images && f.images[0] && f.images[0].name) || 'Image attachment'));
+    : ((f.notes && f.notes.trim()) || 'Image attachment');
   var sl = gs(sid); if (!sl||!sl.elements[en]) return;
   var nv = { id:uid(), value:value, rpv:parseFloat(f.rpv)||null,
              cvr:parseFloat(f.cvr)||null, result:f.result||'fail',
@@ -721,7 +732,7 @@ function saveV(sid, en) {
   var k = fk(sid,en); var f = NFV[k]||{};
   var value = f.value && f.value.trim()
     ? f.value.trim()
-    : ((f.notes && f.notes.trim()) || ((f.images && f.images[0] && f.images[0].name) || 'Image attachment'));
+    : ((f.notes && f.notes.trim()) || 'Image attachment');
   var sl = gs(sid); if (!sl||!sl.elements[en]) return;
   var el = sl.elements[en];
   var v = el.variants.filter(function(x){return x.id===EVF[k];})[0]; if (!v) return;
