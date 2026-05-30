@@ -51,6 +51,11 @@ function uploadImage(image) {
   return _uploadImage(image || {});
 }
 
+function authSheetsTest() {
+  var ss = _spreadsheet();
+  Logger.log(ss.getName());
+}
+
 function authDriveTest() {
   var folder = _imageFolder();
   Logger.log(folder.getName());
