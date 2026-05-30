@@ -5,6 +5,7 @@
 
 var DATA_SHEET = 'CRO_Data';
 var LOG_SHEET  = 'Activity_Log';
+var IMAGE_FOLDER = 'CRO Tracker Images';
 var SPREADSHEET_ID = '';
 
 // GET  ?action=getData   -> returns full tracker JSON
@@ -28,6 +29,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     var body   = JSON.parse(e.postData.contents);
+    if (body.action === 'uploadImage') return _json(_uploadImage(body.image || {}));
     var result = _write(body.data, body.action || {});
     return _json(result);
   } catch(err) {
@@ -42,6 +44,10 @@ function getData() {
 
 function saveData(jsonStr, actionInfo) {
   return _write(jsonStr, actionInfo || {});
+}
+
+function uploadImage(image) {
+  return _uploadImage(image || {});
 }
 
 // ── Internal ─────────────────────────────────────────────────────────────────
@@ -89,6 +95,32 @@ function _spreadsheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('No active spreadsheet. Open the Sheet, go to Extensions -> Apps Script, paste Code.gs there, or set SPREADSHEET_ID in Code.gs.');
   return ss;
+}
+
+function _uploadImage(image) {
+  try {
+    if (!image.data || !image.mimeType) throw new Error('Missing image data.');
+    var bytes = Utilities.base64Decode(image.data);
+    var name = image.name || ('cro-image-' + new Date().getTime());
+    var blob = Utilities.newBlob(bytes, image.mimeType, name);
+    var folder = _imageFolder();
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return {
+      ok: true,
+      image: {
+        id: file.getId(),
+        name: name,
+        url: 'https://drive.google.com/uc?export=view&id=' + file.getId()
+      }
+    };
+  } catch(e) { return { ok: false, error: e.toString() }; }
+}
+
+function _imageFolder() {
+  var folders = DriveApp.getFoldersByName(IMAGE_FOLDER);
+  if (folders.hasNext()) return folders.next();
+  return DriveApp.createFolder(IMAGE_FOLDER);
 }
 
 function _initLog(ss) {

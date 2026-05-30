@@ -90,7 +90,10 @@ a{color:#1a1a18;font-weight:600}
 
 /* ─── Variant list ────────────────────────────────────────────── */
 .vlist{flex:1}
+.vwrap{border-bottom:1px solid #f5f5f3}
+.vwrap:last-child{border-bottom:none}
 .vitem{display:flex;align-items:center;gap:6px;padding:7px 11px;border-bottom:1px solid #f5f5f3;transition:background .1s}
+.vwrap .vitem{border-bottom:none}
 .vitem:last-child{border-bottom:none}
 .vitem:hover{background:#fafaf8}
 .vic{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0}
@@ -104,6 +107,9 @@ a{color:#1a1a18;font-weight:600}
 .vbtn:hover{background:#f0f0ee;color:#1a1a18}
 .vbtn-w:hover{background:#e3f5d0;color:#2d7d0a}
 .vbtn-d:hover{background:#fce8e8;color:#c42b2b}
+.vbtn-e:hover{background:#ddeeff;color:#1460a8}
+.vthumbs{display:flex;gap:5px;flex-wrap:wrap;padding:0 11px 7px 32px}
+.vthumb{width:34px;height:34px;border-radius:6px;border:1px solid #e8e8e5;object-fit:cover;background:#f8f8f6}
 .vempty{padding:14px 12px;font-size:12px;color:#ccc;text-align:center;font-style:italic}
 
 /* ─── Log button ──────────────────────────────────────────────── */
@@ -119,6 +125,15 @@ a{color:#1a1a18;font-weight:600}
 .fg input,.fg select{font-size:12px;font-family:inherit;padding:6px 8px;border:1px solid #ddd;border-radius:6px;background:#fff;color:#1a1a18;outline:none;transition:border-color .15s}
 .fg input:focus,.fg select:focus{border-color:#888}
 .af-btns{display:flex;gap:6px}
+.drop{border:1.5px dashed #ddd;border-radius:8px;background:#fff;padding:9px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;color:#999;font-size:11px;transition:all .15s}
+.drop:hover{border-color:#aaa;background:#fafaf8;color:#666}
+.drop input{display:none}
+.drop-lbl{display:flex;align-items:center;gap:6px;cursor:pointer;min-width:0}
+.drop-imgs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.drop-img{position:relative;width:44px;height:44px}
+.drop-img img{width:44px;height:44px;border-radius:7px;border:1px solid #e8e8e5;object-fit:cover;background:#f8f8f6}
+.drop-rm{position:absolute;right:-5px;top:-5px;width:16px;height:16px;border-radius:50%;border:1px solid #e8e8e5;background:#fff;color:#999;cursor:pointer;font-size:10px;line-height:1}
+.drop-rm:hover{background:#fce8e8;color:#c42b2b}
 
 /* ─── Add-slot form ───────────────────────────────────────────── */
 .sf-wrap{background:#fff;border:1px solid #e8e8e5;border-radius:12px;padding:16px;margin-bottom:14px}
@@ -231,6 +246,7 @@ var OF         = {};
 var SF         = false;
 var AEF        = {};
 var NFV        = {};
+var EVF        = {};
 var NSF        = { funnel:'KLS', platform:'OCU', position:'Pre-Purchase' };
 var saveInFlight = false;
 var pendingSaveAction = null;
@@ -403,6 +419,7 @@ function esc(s)  {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                       .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+function jsq(s)  { return esc(s).replace(/'/g,'&#39;'); }
 function today() { return new Date().toISOString().slice(0,10); }
 
 function ic(r) {
@@ -418,10 +435,13 @@ function varHTML(v, sid, en) {
   var cvr  = v.cvr ? parseFloat(v.cvr).toFixed(1) + '%' : '';
   var dt   = v.date ? v.date.slice(5) : '';
   var xout = v.result === 'fail' ? ' xout' : '';
+  var imgs = (v.images || []).map(function(img) {
+    return '<a href="' + esc(img.url || img.data) + '" target="_blank"><img class="vthumb" src="' + esc(img.url || img.data) + '" title="' + esc(img.name || 'Attached image') + '"></a>';
+  }).join('');
   var wbtn = v.result !== 'win'
-    ? '<button class="vbtn vbtn-w" onclick="setWin(\'' + sid + '\',\'' + esc(en) + '\',\'' + v.id + '\')">Set winner</button>'
+    ? '<button class="vbtn vbtn-w" onclick="setWin(\'' + sid + '\',\'' + jsq(en) + '\',\'' + v.id + '\')">Set winner</button>'
     : '';
-  return '<div class="vitem">' + ic(v.result) +
+  return '<div class="vwrap"><div class="vitem">' + ic(v.result) +
     '<span class="v-val' + xout + '" title="' + esc(v.value) + '">' + esc(v.value) + '</span>' +
     '<span class="v-meta">' +
       (rpv ? '<span class="v-rpv">' + rpv + '</span>' : '') +
@@ -429,21 +449,30 @@ function varHTML(v, sid, en) {
       (dt  ? '<span>' + dt  + '</span>' : '') +
     '</span>' +
     '<span class="v-acts">' + wbtn +
-      '<button class="vbtn vbtn-d" onclick="delV(\'' + sid + '\',\'' + esc(en) + '\',\'' + v.id + '\')">✕</button>' +
-    '</span></div>';
+      '<button class="vbtn vbtn-e" title="Edit result" onclick="editV(\'' + sid + '\',\'' + jsq(en) + '\',\'' + v.id + '\')"><i class="ti ti-pencil"></i></button>' +
+      '<button class="vbtn vbtn-d" onclick="delV(\'' + sid + '\',\'' + jsq(en) + '\',\'' + v.id + '\')">✕</button>' +
+    '</span></div>' +
+    (imgs ? '<div class="vthumbs">' + imgs + '</div>' : '') +
+    '</div>';
 }
 
 function fval(sid, en) {
   var k = fk(sid, en);
-  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'' };
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
   return NFV[k];
 }
 
 function afHTML(sid, en) {
   var f   = fval(sid, en); var k = fk(sid, en);
-  var esc_en = esc(en);
+  var esc_en = jsq(en);
+  var editing = EVF[k];
+  var fileId = 'img_' + sid.replace(/[^a-z0-9]/gi,'_') + '_' + en.replace(/[^a-z0-9]/gi,'_');
   var opts = ['fail','win','running','inconclusive','planned'].map(function(r) {
     return '<option' + (f.result === r ? ' selected' : '') + '>' + r + '</option>';
+  }).join('');
+  var imgs = (f.images || []).map(function(img, i) {
+    return '<span class="drop-img"><img src="' + esc(img.url || img.data) + '" title="' + esc(img.name || 'Attached image') + '">' +
+      '<button class="drop-rm" onclick="rmImg(\'' + k + '\',' + i + ')" title="Remove image">✕</button></span>';
   }).join('');
   return '<div class="aform">' +
     '<div class="af-g">' +
@@ -459,10 +488,16 @@ function afHTML(sid, en) {
       '<div class="fg"><label class="flbl">CVR %</label>' +
         '<input type="number" step="0.01" value="' + esc(f.cvr) + '" placeholder="18.5" oninput="setF(\'' + k + '\',\'cvr\',this.value)"></div>' +
       '<div class="fg af-s"><label class="flbl">Notes</label>' +
-        '<input type="text" value="' + esc(f.notes) + '" placeholder="Views count, which variant, observations…" oninput="setF(\'' + k + '\',\'notes\',this.value)"></div>' +
+        '<input type="text" value="' + esc(f.notes) + '" placeholder="Views count, which variant, observations…" oninput="setF(\'' + k + '\',\'notes\',this.value)">' +
+        '<div class="drop" ondragover="event.preventDefault()" ondrop="event.preventDefault();addImgs(\'' + k + '\',event.dataTransfer.files)">' +
+          '<label class="drop-lbl" for="' + fileId + '"><i class="ti ti-photo-plus"></i><span>Drop image here or click to attach</span></label>' +
+          '<input id="' + fileId + '" type="file" accept="image/*" multiple onchange="addImgs(\'' + k + '\',this.files);this.value=\'\'">' +
+        '</div>' +
+        (imgs ? '<div class="drop-imgs">' + imgs + '</div>' : '') +
+      '</div>' +
     '</div>' +
     '<div class="af-btns">' +
-      '<button class="btn btn-primary btn-sm" onclick="addV(\'' + sid + '\',\'' + esc_en + '\')">Add</button>' +
+      '<button class="btn btn-primary btn-sm" onclick="' + (editing ? 'saveV' : 'addV') + '(\'' + sid + '\',\'' + esc_en + '\')">' + (editing ? 'Save' : 'Add') + '</button>' +
       '<button class="btn btn-sm" onclick="closeF(\'' + sid + '\',\'' + esc_en + '\')">Cancel</button>' +
     '</div></div>';
 }
@@ -477,12 +512,12 @@ function cardHTML(sid, en, ed) {
   return '<div class="ecard">' +
     '<div class="ecard-hdr"><span class="ecard-name">' + esc(en) + '</span>' +
       '<span class="ecard-meta">' + wc +
-        '<button class="ecard-del" title="Delete element" onclick="delElem(\'' + sid + '\',\'' + esc(en) + '\')">✕</button>' +
+        '<button class="ecard-del" title="Delete element" onclick="delElem(\'' + sid + '\',\'' + jsq(en) + '\')">✕</button>' +
       '</span></div>' +
     '<div class="vlist">' + vars + empty + '</div>' +
     (OF[k]
       ? afHTML(sid, en)
-      : '<button class="log-btn" onclick="openF(\'' + sid + '\',\'' + esc(en) + '\')">' +
+      : '<button class="log-btn" onclick="openF(\'' + sid + '\',\'' + jsq(en) + '\')">' +
           '<i class="ti ti-plus" style="font-size:12px"></i> Log a result</button>'
     ) + '</div>';
 }
@@ -563,10 +598,61 @@ function render() {
 // ── Actions ──────────────────────────────────────────────────────────────────
 function setSlot(id)    { S.active = id; render(); }
 function openF(sid, en) { OF[fk(sid,en)] = true; render(); }
-function closeF(sid,en) { delete OF[fk(sid,en)]; delete NFV[fk(sid,en)]; render(); }
+function closeF(sid,en) { delete OF[fk(sid,en)]; delete NFV[fk(sid,en)]; delete EVF[fk(sid,en)]; render(); }
 function setF(k,f,v)    {
-  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'' };
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
   NFV[k][f] = v;
+}
+
+function addImgs(k, files) {
+  if (!files || !files.length) return;
+  if (!NFV[k]) NFV[k] = { value:'', rpv:'', cvr:'', result:'fail', date:today(), notes:'', images:[] };
+  Array.prototype.slice.call(files).forEach(function(file) {
+    if (!file.type || !file.type.match(/^image\//)) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      setStatus('save');
+      uploadImg(file.name, file.type, e.target.result)
+        .then(function(img) {
+          NFV[k].images = NFV[k].images || [];
+          NFV[k].images.push(img);
+          setStatus('ok');
+          render();
+        })
+        .catch(function(error) {
+          setStatus('err', error && error.message ? error.message : String(error || 'Image upload failed'));
+        });
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function uploadImg(name, mimeType, dataUrl) {
+  var data = dataUrl.split(',')[1] || '';
+  var payload = JSON.stringify({ action:'uploadImage', image:{ name:name, mimeType:mimeType, data:data } });
+  if (HAS_APPS_SCRIPT) {
+    return new Promise(function(resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function(r) {
+          if (!r || r.ok === false) reject(new Error(r && r.error ? r.error : 'Image upload failed'));
+          else resolve(r.image);
+        })
+        .withFailureHandler(reject)
+        .uploadImage({ name:name, mimeType:mimeType, data:data });
+    });
+  }
+  return fetch(SCRIPT_URL, { method:'POST', body:payload, headers:{ 'Content-Type':'application/json' } })
+    .then(function(r) { return r.json(); })
+    .then(function(r) {
+      if (!r || r.ok === false) throw new Error(r && r.error ? r.error : 'Image upload failed');
+      return r.image;
+    });
+}
+
+function rmImg(k, idx) {
+  if (!NFV[k] || !NFV[k].images) return;
+  NFV[k].images.splice(idx, 1);
+  render();
 }
 
 function addV(sid, en) {
@@ -575,12 +661,53 @@ function addV(sid, en) {
   var sl = gs(sid); if (!sl||!sl.elements[en]) return;
   var nv = { id:uid(), value:f.value.trim(), rpv:parseFloat(f.rpv)||null,
              cvr:parseFloat(f.cvr)||null, result:f.result||'fail',
-             date:f.date||'', notes:f.notes||'' };
+             date:f.date||'', notes:f.notes||'', images:f.images||[] };
   sl.elements[en].variants.push(nv);
   if (f.result === 'win') sl.elements[en].winner = f.value.trim();
   delete OF[k]; delete NFV[k];
   scheduleSave({ action:'Added variant', funnel:sl.funnel, position:sl.platform+' '+sl.position,
                  element:en, value:nv.value, result:nv.result });
+  render();
+}
+
+function editV(sid, en, vid) {
+  var sl = gs(sid); if (!sl) return;
+  var el = sl.elements[en]; if (!el) return;
+  var v = el.variants.filter(function(x){return x.id===vid;})[0]; if (!v) return;
+  var k = fk(sid,en);
+  EVF[k] = vid;
+  OF[k] = true;
+  NFV[k] = {
+    value:v.value || '',
+    rpv:v.rpv || '',
+    cvr:v.cvr || '',
+    result:v.result || 'fail',
+    date:v.date || today(),
+    notes:v.notes || '',
+    images:(v.images || []).slice()
+  };
+  render();
+}
+
+function saveV(sid, en) {
+  var k = fk(sid,en); var f = NFV[k]||{};
+  if (!f.value||!f.value.trim()) return;
+  var sl = gs(sid); if (!sl||!sl.elements[en]) return;
+  var el = sl.elements[en];
+  var v = el.variants.filter(function(x){return x.id===EVF[k];})[0]; if (!v) return;
+  var oldValue = v.value;
+  v.value = f.value.trim();
+  v.rpv = parseFloat(f.rpv)||null;
+  v.cvr = parseFloat(f.cvr)||null;
+  v.result = f.result||'fail';
+  v.date = f.date||'';
+  v.notes = f.notes||'';
+  v.images = f.images||[];
+  if (v.result === 'win') el.winner = v.value;
+  else if (el.winner === oldValue && !el.variants.some(function(x){return x.result==='win';})) el.winner = null;
+  delete OF[k]; delete NFV[k]; delete EVF[k];
+  scheduleSave({ action:'Edited variant', funnel:sl.funnel, position:sl.platform+' '+sl.position,
+                 element:en, value:v.value, result:v.result });
   render();
 }
 
@@ -600,6 +727,7 @@ function delV(sid, en, vid) {
   var el = sl.elements[en];
   el.variants = el.variants.filter(function(v){return v.id!==vid;});
   if (el.winner && !el.variants.some(function(v){return v.result==='win';})) el.winner = null;
+  if (EVF[fk(sid,en)] === vid) delete EVF[fk(sid,en)];
   scheduleSave({ action:'Deleted variant', funnel:sl.funnel, element:en });
   render();
 }
