@@ -36,6 +36,7 @@ function doPost(e) {
     var body   = JSON.parse(e.postData.contents);
     if (body.action === 'uploadImage') return _json(_uploadImage(body.image || {}));
     if (body.action === 'createStore') return _json(_createStore(body.name || 'New Store'));
+    if (body.action === 'deleteStore') return _json(_deleteStore(body.storeId || ''));
     var result = _write(body.data, body.action || {}, body.storeId || '');
     return _json(result);
   } catch(err) {
@@ -54,6 +55,10 @@ function saveData(jsonStr, actionInfo, storeId) {
 
 function createStore(name) {
   return _createStore(name || 'New Store');
+}
+
+function deleteStore(storeId) {
+  return _deleteStore(storeId || '');
 }
 
 function uploadImage(image) {
@@ -163,6 +168,28 @@ function _createStore(name) {
     var index = ss.getSheetByName(STORE_INDEX_SHEET) || _initStores(ss);
     index.appendRow([id, cleanName, sheetName, new Date()]);
     return _read(id);
+  } catch(e) { return { ok:false, error:e.toString() }; }
+}
+
+function _deleteStore(storeId) {
+  try {
+    var ss = _spreadsheet();
+    var stores = _stores(ss);
+    if (stores.length <= 1) throw new Error('Cannot delete the only store.');
+    var target = stores.filter(function(store) { return store.id === storeId; })[0];
+    if (!target) throw new Error('Store not found.');
+
+    var dataSheet = ss.getSheetByName(target.sheetName);
+    if (dataSheet && ss.getSheets().length > 1) ss.deleteSheet(dataSheet);
+
+    var index = ss.getSheetByName(STORE_INDEX_SHEET) || _initStores(ss);
+    var values = index.getDataRange().getValues();
+    for (var i = values.length - 1; i >= 1; i--) {
+      if (String(values[i][0]) === target.id) index.deleteRow(i + 1);
+    }
+
+    var remaining = _stores(ss);
+    return _read(remaining[0].id);
   } catch(e) { return { ok:false, error:e.toString() }; }
 }
 
