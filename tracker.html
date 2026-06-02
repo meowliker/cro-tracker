@@ -812,9 +812,37 @@ function decisionId(productId, platform, position, elementName, variantId) {
   return [productId, platform, position, elementName, variantId].join('|');
 }
 
+function archivedDecisionId(id) {
+  return 'archive|' + id;
+}
+
+function ensureDecisionArchive() {
+  if (!S.decisions) S.decisions = [];
+  return S.decisions;
+}
+
 function collectDecisions() {
   var rows = [];
   if (!isProductMode()) return rows;
+  (S.decisions || []).forEach(function(d) {
+    rows.push({
+      id: archivedDecisionId(d.id),
+      archived: true,
+      productId: d.productId,
+      product: d.product,
+      platform: d.platform,
+      position: d.position,
+      element: d.element,
+      value: d.value || '',
+      result: d.result || 'planned',
+      startDate: d.startDate || d.decisionDate || '',
+      decisionDate: d.decisionDate || '',
+      notes: d.notes || '',
+      rpv: d.rpv,
+      cvr: d.cvr,
+      images: d.images || []
+    });
+  });
   (S.products || []).forEach(function(product) {
     ensureProductStructure(product);
     Object.keys(product.platforms || {}).forEach(function(platform) {
@@ -827,7 +855,8 @@ function collectDecisions() {
           variants.forEach(function(v) {
             if (!isDecidedResult(v.result)) return;
             rows.push({
-              id: decisionId(product.id, platform, position, elementName, v.id),
+              id: 'active|' + decisionId(product.id, platform, position, elementName, v.id),
+              archived: false,
               productId: product.id,
               product: product.name,
               platform: platform,
@@ -1297,6 +1326,13 @@ function hideDecisionInfo() {
 
 function decisionTarget(id) {
   if (!isProductMode()) return null;
+  if (id.indexOf('archive|') === 0) {
+    var archivedId = id.slice('archive|'.length);
+    var archived = (S.decisions || []).filter(function(d) { return d.id === archivedId; })[0];
+    if (!archived) return null;
+    return { archived:true, archivedId:archivedId, row:archived };
+  }
+  if (id.indexOf('active|') === 0) id = id.slice('active|'.length);
   var found = null;
   (S.products || []).some(function(product) {
     ensureProductStructure(product);
@@ -1321,6 +1357,38 @@ function decisionTarget(id) {
 function addBackDecision(id) {
   var target = decisionTarget(id);
   if (!target) return;
+  if (target.archived) {
+    var row = target.row;
+    var product = productById(row.productId);
+    if (!product) {
+      alert('This product no longer exists.');
+      return;
+    }
+    ensureProductStructure(product);
+    var platform = row.platform === 'AfterSell' ? 'AfterSell' : 'OCU';
+    var position = platform === 'AfterSell' ? row.position : 'Pre-Purchase';
+    product.platforms[platform].positions[position] = product.platforms[platform].positions[position] || emptyPosition(platform);
+    var elements = product.platforms[platform].positions[position].elements;
+    elements[row.element] = elements[row.element] || { winner:null, variants:[] };
+    elements[row.element].variants.push({
+      id: uid(),
+      value: row.value || '',
+      rpv: row.rpv || null,
+      cvr: row.cvr || null,
+      result: 'running',
+      date: row.decisionDate || today(),
+      notes: row.notes || '',
+      images: row.images || []
+    });
+    S.decisions = (S.decisions || []).filter(function(d) { return d.id !== target.archivedId; });
+    S.activeProductId = product.id;
+    S.activePlatform = platform;
+    if (platform === 'AfterSell') product.platforms.AfterSell.activePosition = position;
+    S.activePosition = position;
+    scheduleSave({ action:'Added archived result back', store:activeStore().name, value:row.value, result:'running' });
+    render();
+    return;
+  }
   target.variant.result = 'running';
   if (target.element.winner === target.variant.value) {
     var nextWinner = (target.element.variants || []).filter(function(v) { return v.result === 'win'; })[0];
@@ -1425,13 +1493,47 @@ function delV(sid, en, vid) {
   render();
 }
 
+function archiveElementDecisions(sl, en) {
+  if (!isProductMode() || !sl || !sl.elements || !sl.elements[en]) return 0;
+  var product = activeProduct();
+  if (!product) return 0;
+  var el = sl.elements[en];
+  var dated = (el.variants || []).map(function(v) { return v.date || ''; }).filter(Boolean).sort();
+  var startDate = dated[0] || '';
+  var archived = ensureDecisionArchive();
+  var count = 0;
+  (el.variants || []).forEach(function(v) {
+    if (!isDecidedResult(v.result)) return;
+    archived.push({
+      id: uid(),
+      productId: product.id,
+      product: product.name,
+      platform: sl.platform,
+      position: sl.position,
+      element: en,
+      value: v.value || '',
+      result: v.result || 'planned',
+      startDate: startDate || v.date || '',
+      decisionDate: v.date || '',
+      notes: v.notes || '',
+      rpv: v.rpv,
+      cvr: v.cvr,
+      images: (v.images || []).slice(),
+      archivedAt: today()
+    });
+    count++;
+  });
+  return count;
+}
+
 function delElem(sid, en) {
   var sl = gs(sid); if (!sl || !sl.elements[en]) return;
-  if (!confirm('Delete "' + en + '" and all of its results?')) return;
+  if (!confirm('Delete "' + en + '"? Decided results will stay in Results. Active results inside this element will be deleted.')) return;
+  var archivedCount = archiveElementDecisions(sl, en);
   delete sl.elements[en];
   delete OF[fk(sid,en)];
   delete NFV[fk(sid,en)];
-  scheduleSave({ action:'Deleted element', funnel:sl.funnel, position:sl.platform+' '+sl.position, element:en });
+  scheduleSave({ action:'Deleted element', funnel:sl.funnel, position:sl.platform+' '+sl.position, element:en, value:archivedCount ? archivedCount + ' decided result(s) preserved' : '' });
   render();
 }
 
