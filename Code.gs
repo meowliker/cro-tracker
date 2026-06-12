@@ -98,8 +98,9 @@ function _write(jsonStr, actionInfo, storeId) {
   try {
     var ss    = _spreadsheet();
     var store = _storeFor(ss, storeId);
-    _validateTrackerData(jsonStr);
+    var nextData = _validateTrackerData(jsonStr);
     var sheet = ss.getSheetByName(store.sheetName) || ss.insertSheet(store.sheetName);
+    _protectAgainstAccidentalAfterSellWipe(sheet, nextData, actionInfo || {});
     _backupCurrentData(ss, sheet);
     sheet.getRange('A1').setValue(jsonStr);
 
@@ -218,7 +219,7 @@ function _validateTrackerData(jsonStr) {
     if (data.activeProductId && !data.products.some(function(product) { return product.id === data.activeProductId; })) {
       throw new Error('Rejected save: active product is missing from tracker data.');
     }
-    return;
+    return data;
   }
   if (!data || !Array.isArray(data.slots) || !data.slots.length) {
     throw new Error('Rejected save: tracker data must contain at least one slot.');
@@ -226,6 +227,71 @@ function _validateTrackerData(jsonStr) {
   if (!data.active || !data.slots.some(function(slot) { return slot.id === data.active; })) {
     throw new Error('Rejected save: active slot is missing from tracker data.');
   }
+  return data;
+}
+
+function _protectAgainstAccidentalAfterSellWipe(sheet, nextData, actionInfo) {
+  if (!nextData || !Array.isArray(nextData.products)) return;
+  if (_isExplicitDeleteAction(actionInfo)) return;
+
+  var currentText = sheet.getRange('A1').getValue();
+  if (!currentText) return;
+
+  var currentData;
+  try { currentData = _parseTrackerJson(currentText); } catch(e) { return; }
+  if (!currentData || !Array.isArray(currentData.products)) return;
+
+  var nextById = {};
+  nextData.products.forEach(function(product) {
+    if (product && product.id) nextById[product.id] = product;
+  });
+
+  currentData.products.forEach(function(currentProduct) {
+    if (!currentProduct || !currentProduct.id) return;
+    var nextProduct = nextById[currentProduct.id];
+    if (!nextProduct) return;
+
+    var currentCount = _afterSellVariantCount(currentProduct);
+    var nextCount = _afterSellVariantCount(nextProduct);
+    if (currentCount > 0 && nextCount === 0) {
+      throw new Error(
+        'Rejected save: this would remove all AfterSell upsell data for "' +
+        (currentProduct.name || currentProduct.id) +
+        '". Reload the tracker and try again. If you meant to delete it, delete the element/result explicitly.'
+      );
+    }
+  });
+}
+
+function _isExplicitDeleteAction(actionInfo) {
+  var action = String(actionInfo && actionInfo.action || '').toLowerCase();
+  return action.indexOf('deleted element') !== -1 ||
+    action.indexOf('deleted variant') !== -1 ||
+    action.indexOf('deleted product') !== -1;
+}
+
+function _afterSellVariantCount(product) {
+  var platform = product &&
+    product.platforms &&
+    product.platforms.AfterSell;
+  return _platformVariantCount(platform);
+}
+
+function _platformVariantCount(platform) {
+  var count = 0;
+  var positions = platform && platform.positions ? platform.positions : {};
+  Object.keys(positions).forEach(function(positionName) {
+    var elements = positions[positionName] && positions[positionName].elements
+      ? positions[positionName].elements
+      : {};
+    Object.keys(elements).forEach(function(elementName) {
+      var variants = elements[elementName] && elements[elementName].variants
+        ? elements[elementName].variants
+        : [];
+      count += variants.length;
+    });
+  });
+  return count;
 }
 
 function _defaultTrackerForStore(store) {
