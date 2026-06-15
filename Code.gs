@@ -267,6 +267,7 @@ function _protectAgainstAccidentalAfterSellWipe(sheet, nextData, actionInfo) {
 function _protectAgainstAccidentalDecisionWipe(sheet, nextData, actionInfo) {
   if (!nextData || !Array.isArray(nextData.products)) return;
   if (_isExplicitDeleteAction(actionInfo)) return;
+  if (_isExplicitResultRestoreAction(actionInfo)) return;
 
   var currentText = sheet.getRange('A1').getValue();
   if (!currentText) return;
@@ -289,6 +290,12 @@ function _isExplicitDeleteAction(actionInfo) {
   return action.indexOf('deleted element') !== -1 ||
     action.indexOf('deleted variant') !== -1 ||
     action.indexOf('deleted product') !== -1;
+}
+
+function _isExplicitResultRestoreAction(actionInfo) {
+  var action = String(actionInfo && actionInfo.action || '').toLowerCase();
+  return action.indexOf('added result back') !== -1 ||
+    action.indexOf('added archived result back') !== -1;
 }
 
 function _afterSellVariantCount(product) {
