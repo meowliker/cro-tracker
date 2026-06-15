@@ -101,7 +101,8 @@ function _write(jsonStr, actionInfo, storeId) {
     var nextData = _validateTrackerData(jsonStr);
     var sheet = ss.getSheetByName(store.sheetName) || ss.insertSheet(store.sheetName);
     _protectAgainstAccidentalAfterSellWipe(sheet, nextData, actionInfo || {});
-    _backupCurrentData(ss, sheet);
+    _protectAgainstAccidentalDecisionWipe(sheet, nextData, actionInfo || {});
+    _backupCurrentData(ss, sheet, store);
     sheet.getRange('A1').setValue(jsonStr);
 
     var logSheet = ss.getSheetByName(LOG_SHEET) || _initLog(ss);
@@ -263,6 +264,26 @@ function _protectAgainstAccidentalAfterSellWipe(sheet, nextData, actionInfo) {
   });
 }
 
+function _protectAgainstAccidentalDecisionWipe(sheet, nextData, actionInfo) {
+  if (!nextData || !Array.isArray(nextData.products)) return;
+  if (_isExplicitDeleteAction(actionInfo)) return;
+
+  var currentText = sheet.getRange('A1').getValue();
+  if (!currentText) return;
+
+  var currentData;
+  try { currentData = _parseTrackerJson(currentText); } catch(e) { return; }
+  if (!currentData || !Array.isArray(currentData.products)) return;
+
+  var currentCount = _decisionCount(currentData);
+  var nextCount = _decisionCount(nextData);
+  if (currentCount > 0 && nextCount === 0) {
+    throw new Error(
+      'Rejected save: this would remove all decided Results for this store. Reload the tracker and try again.'
+    );
+  }
+}
+
 function _isExplicitDeleteAction(actionInfo) {
   var action = String(actionInfo && actionInfo.action || '').toLowerCase();
   return action.indexOf('deleted element') !== -1 ||
@@ -292,6 +313,38 @@ function _platformVariantCount(platform) {
     });
   });
   return count;
+}
+
+function _decisionCount(data) {
+  var count = 0;
+  (data.decisions || []).forEach(function(decision) {
+    if (_isDecidedResult(decision && decision.result)) count++;
+  });
+  (data.products || []).forEach(function(product) {
+    Object.keys(product.platforms || {}).forEach(function(platformName) {
+      var positions = product.platforms[platformName] && product.platforms[platformName].positions
+        ? product.platforms[platformName].positions
+        : {};
+      Object.keys(positions).forEach(function(positionName) {
+        var elements = positions[positionName] && positions[positionName].elements
+          ? positions[positionName].elements
+          : {};
+        Object.keys(elements).forEach(function(elementName) {
+          var variants = elements[elementName] && elements[elementName].variants
+            ? elements[elementName].variants
+            : [];
+          variants.forEach(function(variant) {
+            if (_isDecidedResult(variant && variant.result)) count++;
+          });
+        });
+      });
+    });
+  });
+  return count;
+}
+
+function _isDecidedResult(result) {
+  return ['win','fail','inconclusive'].indexOf(String(result || '')) !== -1;
 }
 
 function _defaultTrackerForStore(store) {
@@ -330,14 +383,23 @@ function _parseTrackerJson(jsonStr) {
   return JSON.parse(text);
 }
 
-function _backupCurrentData(ss, dataSheet) {
+function _backupCurrentData(ss, dataSheet, store) {
   var current = dataSheet.getRange('A1').getValue();
   if (!current) return;
   var backupSheet = ss.getSheetByName(BACKUP_SHEET) || _initBackup(ss);
+  _ensureBackupHeader(backupSheet);
   var lastRow = backupSheet.getLastRow();
-  var lastBackup = lastRow > 1 ? backupSheet.getRange(lastRow, 2).getValue() : '';
+  var lastBackup = lastRow > 1
+    ? (backupSheet.getRange(lastRow, 5).getValue() || backupSheet.getRange(lastRow, 2).getValue())
+    : '';
   if (lastBackup === current) return;
-  backupSheet.appendRow([new Date(), current]);
+  backupSheet.appendRow([
+    new Date(),
+    store && store.id || '',
+    store && store.name || '',
+    dataSheet.getName(),
+    current
+  ]);
 }
 
 function _spreadsheet() {
@@ -384,10 +446,14 @@ function _initLog(ss) {
 
 function _initBackup(ss) {
   var s = ss.getSheetByName(BACKUP_SHEET) || ss.insertSheet(BACKUP_SHEET);
-  s.getRange(1,1,1,2).setValues([['Timestamp','CRO_Data_A1']]);
-  s.setFrozenRows(1);
-  s.getRange(1,1,1,2).setFontWeight('bold');
+  _ensureBackupHeader(s);
   return s;
+}
+
+function _ensureBackupHeader(s) {
+  s.getRange(1,1,1,5).setValues([['Timestamp','Store ID','Store Name','Data Sheet','Tracker JSON']]);
+  s.setFrozenRows(1);
+  s.getRange(1,1,1,5).setFontWeight('bold');
 }
 
 function _seed() {

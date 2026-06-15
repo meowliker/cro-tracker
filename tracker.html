@@ -924,7 +924,7 @@ function decisionSidebarHTML() {
       '<div class="decision-meta"><span>' + esc(row.platform) + '</span><span>·</span><span>' + esc(row.position) + '</span></div>' +
       '<span class="decision-badge ' + esc(row.result) + '">' + esc(resultLabel(row.result)) + '</span>' +
       '<div class="decision-dates"><span><strong>Start</strong> ' + esc(dateLabel(row.startDate)) + '</span><span><strong>Decision</strong> ' + esc(dateLabel(row.decisionDate)) + '</span></div>' +
-      '<div class="decision-actions"><button class="btn btn-sm" onclick="addBackDecision(\'' + jsq(row.id) + '\')"><i class="ti ti-arrow-back-up"></i> Add Back</button></div>' +
+      '<div class="decision-actions"><button class="btn btn-sm" title="Keep this result and create a new running test from it" onclick="addBackDecision(\'' + jsq(row.id) + '\')"><i class="ti ti-arrow-back-up"></i> Run Again</button></div>' +
     '</div>';
   }).join('');
   return '<aside class="decision-sidebar">' +
@@ -1393,25 +1393,29 @@ function addBackDecision(id) {
       notes: row.notes || '',
       images: row.images || []
     });
-    S.decisions = (S.decisions || []).filter(function(d) { return d.id !== target.archivedId; });
     S.activeProductId = product.id;
     S.activePlatform = platform;
     if (platform === 'AfterSell') product.platforms.AfterSell.activePosition = position;
     S.activePosition = position;
-    scheduleSave({ action:'Added archived result back', store:activeStore().name, value:row.value, result:'running' });
+    scheduleSave({ action:'Copied archived result back as active test', store:activeStore().name, value:row.value, result:'running' });
     render();
     return;
   }
-  target.variant.result = 'running';
-  if (target.element.winner === target.variant.value) {
-    var nextWinner = (target.element.variants || []).filter(function(v) { return v.result === 'win'; })[0];
-    target.element.winner = nextWinner ? nextWinner.value : null;
-  }
+  target.element.variants.push({
+    id: uid(),
+    value: target.variant.value || '',
+    rpv: target.variant.rpv || null,
+    cvr: target.variant.cvr || null,
+    result: 'running',
+    date: today(),
+    notes: target.variant.notes || '',
+    images: (target.variant.images || []).slice()
+  });
   S.activeProductId = target.product.id;
   S.activePlatform = target.platform;
   if (target.platform === 'AfterSell') target.product.platforms.AfterSell.activePosition = target.position;
   S.activePosition = target.position;
-  scheduleSave({ action:'Added result back', store:activeStore().name, value:target.variant.value, result:'running' });
+  scheduleSave({ action:'Copied decided result back as active test', store:activeStore().name, value:target.variant.value, result:'running' });
   render();
 }
 
